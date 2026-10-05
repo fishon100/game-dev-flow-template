@@ -31,7 +31,7 @@ Changes can be parked（暫存）— temporarily moved out of `docs/spectra/chan
 
 # CLAUDE.md — 給 AI 的專案規則
 
-> 人讀的完整流程在 `docs/flow/`（00 總覽 → 07 對 AI 說的話）。這份是 AI 執行時一定要遵守的規則。
+> 人讀的完整流程在 `docs/flow/`（00 總覽 → 08 工作台與遠端操作）。這份是 AI 執行時一定要遵守的規則。
 > 開新專案時：改「這是什麼專案」一節，其餘保留。
 
 ## 這是什麼專案
@@ -43,22 +43,28 @@ Changes can be parked（暫存）— temporarily moved out of `docs/spectra/chan
 | 內容 | 正本 | 規則 |
 |---|---|---|
 | 遊戲規則 | `docs/spectra/specs/` | 只能透過 Spectra 申請單改 |
-| 申請單 | `docs/spectra/changes/` | Notion「申請單確認」只放摘要、狀態、連結 |
-| 需求、回饋、知識庫、素材狀態、開發日誌 | Notion（ID 在 `docs/notion.json`） | 用 Notion 連接器讀寫 |
+| 申請單 | `docs/spectra/changes/` | 「申請單」GitHub Issue 由 workbench Action 自動開關（只放摘要＋同意勾選）；Notion 卡片選用 |
+| 企劃同意 | 申請單 `tasks.md` 的 `0.1 企劃確認` | 唯一判準。入口：Issue 勾選（Action 自動寫回）、Notion 狀態「同意」、Spectra 桌面版、對話中說「同意」 |
+| 需求、回饋 | GitHub Issue（標籤「需求」「回饋」）；有 Notion 的專案另看 Notion | `gh issue list -l 回饋 -s open` |
+| 知識庫、素材、開發日誌 | Notion（`docs/notion.json` 有 ID 時）否則 `docs/企劃/` | 有 Notion 用連接器讀寫 |
 | 手感數值 | `web/tuning.json` | 不寫死在程式裡 |
 | 試算表（關卡、數值表） | 企劃匯出到 `tools/tables/in/` | `.xlsx` 先跑 `node tools/tables/to-csv.mjs`；**不要自己改表**，有問題列出「第幾列・哪一欄・問題」給企劃 |
 
 ## 開發規則
 1. **改規則一定開申請單**（`/spectra-propose`）。只有「不改規則的小修」（錯字、顏色、明確的 bug）可以直接修，但要記開發日誌
-2. 申請單寫好後，在 Notion「申請單確認」建卡（狀態：待同意，摘要含「需要企劃確認的事」），**等企劃同意才 `/spectra-apply`**。企劃在對話裡直接說「同意」也算
+2. 申請單照 `docs/spectra/config.yaml` 的規則寫（中文標題、需要企劃確認的事、tasks 第一項 0.1 企劃確認）。寫好就 commit＋push：workbench Action 會自動開「申請單」Issue、工作台顯示「待同意」。有 Notion 的專案另建「申請單確認」卡片（附 Issue 連結）
+   - **`/spectra-apply` 前一定先確認 0.1 已勾**（先 `git pull`，因為 Issue 勾選是 Action 寫回的）。沒勾就停下來，告訴使用者去工作台同意
+   - 0.1 只有這幾種情況可以由 AI 勾：企劃在對話中明確說「同意 <名稱>」（註明「企劃於對話中同意，日期」）、Notion 卡片狀態是「同意」（註明「企劃於 Notion 同意，日期」）。絕不自己決定同意
+   - 「看申請單」：讀每張待同意申請單 Issue 的留言（`gh issue view <N> --comments`）與 Notion 狀態；有意見就改申請單、在 Issue 回覆改了什麼
+   - 申請單內容在同意後又改了（`/spectra-ingest`）：把 0.1 改回 `- [ ]`、去掉註記，推上去；Action 會清掉 Issue 的勾並請企劃重新確認
 3. TDD：先寫會失敗的測試 → 實作 → `node --test` 全過。規則書每個「情境」對應一個測試；寫完把程式改壞一次確認測試會失敗
 4. 難度一定用擬人玩家量（反應時間＋時機／對準誤差，見 `docs/flow/04 品質把關.md`），每個判斷 30～40 局，不准用機器反應速度下結論
-5. 結案前跑 `/spectra-verify`；結案（`/spectra-archive`）後：Notion 申請單卡改「已結案」、開發日誌新增一筆（回饋 → 改了什麼 → 數據 → 驗收）
+5. 結案前跑 `/spectra-verify`；結案（`/spectra-archive`）後推上去（Action 會自動關閉申請單 Issue），開發日誌新增一筆（回饋 → 改了什麼 → 數據 → 驗收）；有 Notion 的專案把卡片改「已結案」
 6. 部署＝推上 `main`，GitHub Actions 會跑測試、部署 Pages、ntfy 通知手機。推之前本機先跑 `node --test`
-7. 處理回饋：🟢 的東西保留不動；回饋裡的名詞對照 Notion 知識庫「名詞表」，不確定的先問
+7. 處理回饋：🟢 的東西保留不動；回饋裡的名詞對照知識庫「名詞表」，不確定的先問。處理完在回饋 Issue 回覆「改了什麼、哪張申請單或哪個版本」並關閉（`gh issue close <N> -c "…"`）
 
 ## 對話指令（完整版見 `docs/flow/07 對 AI 說的話.md`）
-看需求｜討論 X｜把 X 開成申請單｜看申請單｜做 X｜X 改成…｜看回饋｜X 結案｜修 X｜同步 <知識庫頁面／表名>｜套用調參｜換上 <素材>｜現在做到哪｜量一下 X 難度｜接上 Notion 工作區｜檢查連接器｜更新專案首頁｜同步開發流｜備份｜部署
+現在做到哪｜看需求｜討論 X｜把 X 開成申請單｜同意 X｜看申請單｜做 X｜X 改成…｜看回饋｜X 結案｜修 X｜同步 <知識庫頁面／表名>｜套用調參｜換上 <素材>｜現在做到哪｜量一下 X 難度｜建／接上 Notion 工作區｜檢查環境｜檢查連接器｜更新工作台｜更新專案首頁｜同步開發流｜備份｜部署
 
 ## 「檢查連接器」
 列出 Notion／Figma／Google Drive 連接器與 `gh auth status`；每個都實際讀一樣東西（Notion：`docs/notion.json` 的首頁；Drive：專案資料夾）確認**帳號是專案的帳號**。帳號不對就停下來告訴使用者，不要在別人的雲端硬碟裡搜尋。
@@ -70,6 +76,10 @@ Changes can be parked（暫存）— temporarily moved out of `docs/spectra/chan
 | 本機預覽 | `node tools/serve.mjs` → http://localhost:8080（測試頁 `/test.html`） |
 | xlsx 轉 csv | `node tools/tables/to-csv.mjs` |
 | 看申請單 | `spxa list`、`spxa show <名稱>`、`spxa validate` |
+| 檢查環境（換電腦後） | `node tools/doctor.mjs` |
+| 更新工作台 | `gh workflow run workbench` |
+| 工作台本機預覽 | `node tools/serve.mjs` → http://localhost:8080/workbench/?data=demo.json |
+| gh 要登入／加權限 | 在**自己的 Bash** 背景執行 `gh auth refresh -h github.com -s workflow`，把代碼給使用者到 https://github.com/login/device 輸入（使用者的終端機可能是另一個環境） |
 | 備份到 Obsidian | `powershell -ExecutionPolicy Bypass -File tools\backup-obsidian.ps1` |
 | 本機通知 | `powershell -ExecutionPolicy Bypass -File tools\notify.ps1 -Title "標題" -Message "內容"` |
 

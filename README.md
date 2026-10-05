@@ -5,6 +5,8 @@
 - **骨幹**：[Spectra](https://github.com/kaochenlong/spectra-app) 規格驅動開發（SDD）＋自動測試（TDD）
 - **分工**：人寫需求、確認、試玩（Notion）；AI 寫申請單、程式、測試、部署（GitHub）
 - **預覽**：每次推上 GitHub 自動跑測試、部署到 GitHub Pages、手機收到通知
+- **🧭 工作台**：給不寫程式的人的網頁（手機可加到主畫面）：等我處理、申請單進度、同意、寫回饋、提需求、規則書、上線紀錄 → [打開範例](https://fishon100.github.io/game-dev-flow-template/workbench/?repo=fishon100/pinball-sling)
+- **在哪裡都能同意**：工作台／GitHub Issue（手機）、Notion、Spectra 桌面版、或跟 AI 說——最後都記在申請單任務 0.1
 
 ```
  Notion（人）                         GitHub（AI）
@@ -24,13 +26,14 @@
 | 企劃／美術／劇本／數值 | [02 角色分工](docs/flow/02%20角色分工.md) → [07 對 AI 說的話](docs/flow/07%20對%20AI%20說的話.md) |
 | 要開新專案 | [06 新專案啟動](docs/flow/06%20新專案啟動.md) |
 | 程式 | [03 Notion 與 GitHub](docs/flow/03%20Notion%20與%20GitHub.md)、[04 品質把關](docs/flow/04%20品質把關.md)、[CLAUDE.md](CLAUDE.md) |
-| 接手別人的專案 | [05 工具與帳號](docs/flow/05%20工具與帳號.md) 的「換帳號／換人接手清單」 |
+| 接手別人的專案、換電腦 | [05 工具與帳號](docs/flow/05%20工具與帳號.md) 的「換一台電腦」「換 Claude 帳號／換人接手」 |
+| 用手機參與、不在電腦前 | [08 工作台與遠端操作](docs/flow/08%20工作台與遠端操作.md) |
 
 ## 開新專案（摘要）
 
 1. 按 GitHub 上的 **Use this template** 建新 repo，clone 到本機
 2. `npm install -g @kaochenlong/spxa`，在專案資料夾跑 `spxa init --tools claude`
-3. Settings → Pages → Source 選 **GitHub Actions**；（選用）Secrets 加 `NTFY_TOPIC`
+3. Settings → Pages → Source 選 **GitHub Actions**；Settings → Actions → Workflow permissions 選 **Read and write**；（選用）Secrets 加 `NTFY_TOPIC`
 4. Claude 連好 Notion，說「**建 Notion 工作區**」
 5. 寫主架構規劃書，然後說：`/goal 依主架構規劃書做出第一個可玩版本，測試全過、部署並通知`
 
@@ -42,13 +45,19 @@
 docs/flow/              開發流說明（人讀）
 docs/spectra/           規則書（specs）與申請單（changes）——遊戲規則的正本
 docs/notion.json        Notion 頁面與資料庫 ID
+docs/notion-import/     Notion 手動匯入用的 CSV
+docs/企劃/              沒有 Notion 時的主架構規劃書、名詞表、開發日誌
 web/                    遊戲（範例：接球）。rules.js＝規則、game.js＝畫面、tuning.json＝手感數值
 tests/                  規則測試（node --test）
 tools/serve.mjs         本機預覽
 tools/tables/to-csv.mjs 企劃的 xlsx → csv（保留千分位、長數字不變形）
 tools/notify.ps1        Windows 通知＋ntfy 手機推播
 tools/backup-obsidian.ps1  備份文件到本機 Obsidian
-.github/workflows/      測試 → 部署 Pages → 手機通知
+tools/doctor.mjs        檢查環境（換電腦後跑一次）
+tools/workbench/        工作台同步（同意寫回、開關申請單 Issue、產生工作台資料）
+web/workbench/          工作台網頁
+.github/ISSUE_TEMPLATE/ 寫回饋、提需求的表單
+.github/workflows/      deploy：測試 → 部署 Pages → 手機通知；workbench：同意寫回、申請單 Issue、工作台資料
 CLAUDE.md               給 AI 的規則
 ```
 

@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>開發工作台</title>
+<meta name="theme-color" content="#5b3fd6">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+<style>
+:root {
+  --bg: #f6f5fb; --card: #ffffff; --ink: #1d1b29; --muted: #6b6880; --line: #e6e3f0;
+  --brand: #5b3fd6; --brand-ink: #ffffff; --brand-soft: #ece8ff;
+  --ok: #138a4b; --ok-soft: #e3f6ec; --warn: #b26a00; --warn-soft: #fff3dc; --bad: #c62828; --bad-soft: #fde8e8;
+  --info: #1f6feb; --info-soft: #e6f0ff; --shadow: 0 1px 2px rgb(20 10 60 / .06), 0 4px 16px rgb(20 10 60 / .05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12111a; --card: #1c1a28; --ink: #ecebf5; --muted: #a29fb8; --line: #2e2b40;
+    --brand: #9b85ff; --brand-ink: #12111a; --brand-soft: #2a2350;
+    --ok: #4cd391; --ok-soft: #173326; --warn: #ffb547; --warn-soft: #3a2b12; --bad: #ff7676; --bad-soft: #3d1a1d;
+    --info: #79a8ff; --info-soft: #172640; --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12111a; --card: #1c1a28; --ink: #ecebf5; --muted: #a29fb8; --line: #2e2b40;
+  --brand: #9b85ff; --brand-ink: #12111a; --brand-soft: #2a2350;
+  --ok: #4cd391; --ok-soft: #173326; --warn: #ffb547; --warn-soft: #3a2b12; --bad: #ff7676; --bad-soft: #3d1a1d;
+  --info: #79a8ff; --info-soft: #172640; --shadow: none;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; }
+a { color: var(--brand); }
+.wrap { max-width: 920px; margin: 0 auto; padding: 0 16px 96px; }
+header.top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+header.top .wrap { padding-bottom: 0; display: flex; align-items: center; gap: 12px; min-height: 56px; }
+h1 { font-size: 18px; margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fresh { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.iconbtn { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 10px; min-width: 40px; height: 40px; font-size: 18px; cursor: pointer; }
+nav.tabs { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 12px; scrollbar-width: none; }
+nav.tabs::-webkit-scrollbar { display: none; }
+nav.tabs button { flex: none; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; cursor: pointer; }
+nav.tabs button[aria-selected="true"] { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.badge { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 12px; line-height: 20px; text-align: center; margin-left: 4px; }
+section { margin-top: 18px; }
+h2 { font-size: 17px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+h2 small { font-weight: 400; color: var(--muted); font-size: 13px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
+.stack > * + * { margin-top: 10px; }
+.grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.actions { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.btn { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; font-weight: 600; font-size: 15px; text-align: center; }
+.btn.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.btn.ok { background: var(--ok); color: #fff; border-color: var(--ok); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.s-待同意 { background: var(--warn-soft); color: var(--warn); }
+.s-已同意, .s-實作中 { background: var(--info-soft); color: var(--info); }
+.s-待結案 { background: var(--brand-soft); color: var(--brand); }
+.s-已結案 { background: var(--ok-soft); color: var(--ok); }
+.lv-red { background: var(--bad-soft); color: var(--bad); } .lv-yellow { background: var(--warn-soft); color: var(--warn); } .lv-green { background: var(--ok-soft); color: var(--ok); }
+.title { font-weight: 700; font-size: 16px; margin: 6px 0 2px; }
+.muted { color: var(--muted); font-size: 14px; }
+.why { font-size: 14px; color: var(--ink); white-space: pre-line; margin: 6px 0; }
+.ask { background: var(--warn-soft); border-radius: 10px; padding: 8px 12px; font-size: 14px; white-space: pre-line; margin: 8px 0; }
+.bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 8px 0 4px; }
+.bar > i { display: block; height: 100%; background: var(--brand); border-radius: 99px; }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.list li:first-child { border-top: 0; }
+.list .grow { flex: 1; min-width: 0; }
+.list a.t { color: var(--ink); text-decoration: none; font-weight: 600; overflow-wrap: anywhere; }
+.dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; flex: none; }
+.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); } .dot.run { background: var(--warn); }
+.empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+.hero { background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 60%, #ff4fa3)); color: #fff; border: 0; }
+.hero .num { font-size: 34px; font-weight: 800; line-height: 1; }
+.hero a { color: #fff; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+.stat b { display: block; font-size: 22px; }
+.stat span { font-size: 12px; color: var(--muted); }
+details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.help h3 { font-size: 15px; margin: 14px 0 4px; }
+.help ol, .help ul { padding-left: 20px; margin: 4px 0; font-size: 14px; }
+code { background: var(--brand-soft); padding: 1px 6px; border-radius: 6px; font-size: 13px; }
+.err { background: var(--bad-soft); color: var(--bad); }
+[hidden] { display: none !important; }
+@media (max-width: 480px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1 id="proj">開發工作台</h1>
+    <span class="fresh" id="fresh"></span>
+    <button class="iconbtn" id="reload" title="重新整理" aria-label="重新整理">⟳</button>
+  </div>
+  <div class="wrap" style="padding-bottom:0">
+    <nav class="tabs" role="tablist" aria-label="工作台分頁">
+      <button role="tab" data-tab="home" aria-selected="true">🏠 首頁</button>
+      <button role="tab" data-tab="changes">📋 申請單</button>
+      <button role="tab" data-tab="issues">💬 回饋與需求</button>
+      <button role="tab" data-tab="specs">📘 規則書</button>
+      <button role="tab" data-tab="activity">🚀 上線紀錄</button>
+      <button role="tab" data-tab="help">❓ 怎麼用</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="status" class="card" style="margin-top:16px">讀取中…</div>
+
+  <div data-panel="home" class="stack" hidden>
+    <section>
+      <div class="card hero stack" id="todo"></div>
+    </section>
+    <section>
+      <h2>快速動作</h2>
+      <div class="actions" id="quick"></div>
+    </section>
+    <section>
+      <div class="stats" id="stats"></div>
+    </section>
+    <section>
+      <h2>進行中的申請單</h2>
+      <div class="grid" id="home-active"></div>
+    </section>
+    <section>
+      <h2>最近上線</h2>
+      <div class="card"><ul class="list" id="home-runs"></ul></div>
+    </section>
+  </div>
+
+  <div data-panel="changes" hidden>
+    <section><h2>進行中 <small>依狀態排序</small></h2><div class="grid" id="ch-active"></div></section>
+    <section><h2>已結案 <small id="ch-archived-n"></small></h2><div class="card"><ul class="list" id="ch-archived"></ul></div></section>
+  </div>
+
+  <div data-panel="issues" hidden>
+    <section><div class="actions" id="quick2"></div></section>
+    <section><h2>回饋 <small>還沒處理的</small></h2><div class="card"><ul class="list" id="fb-open"></ul></div></section>
+    <section><h2>需求 <small>還沒處理的</small></h2><div class="card"><ul class="list" id="rq-open"></ul></div></section>
+    <section><details class="card"><summary>已處理的回饋與需求</summary><ul class="list" id="iss-closed"></ul></details></section>
+  </div>
+
+  <div data-panel="specs" hidden>
+    <section><h2>規則書 <small>遊戲「現在」的規則；要改請開申請單</small></h2><div class="card"><ul class="list" id="specs"></ul></div></section>
+  </div>
+
+  <div data-panel="activity" hidden>
+    <section><h2>自動測試與部署</h2><div class="card"><ul class="list" id="runs"></ul></div></section>
+    <section><h2>最近的改動</h2><div class="card"><ul class="list" id="commits"></ul></div></section>
+  </div>
+
+  <div data-panel="help" class="help" hidden>
+    <section class="card">
+      <h2>這個工作台是什麼</h2>
+      <p class="muted">專案的總覽：哪些申請單在等你同意、做到哪、有哪些回饋還沒處理、最近有沒有上線成功。手機、電腦、平板都能開，不用安裝任何東西。可以「加到主畫面」當 App 用。</p>
+      <h3>✅ 同意一張申請單（手機也可以）</h3>
+      <ol>
+        <li>首頁「需要你處理」→ 點申請單的 <b>看內容並同意</b></li>
+        <li>會打開 GitHub：讀「為什麼、改什麼、需要企劃確認的事」</li>
+        <li>沒問題就勾 <b>☐ 企劃同意</b>（GitHub App 或網頁都能勾）；有意見就在下面留言</li>
+        <li>約 1 分鐘後，工作台會顯示「已同意」，AI 就能開始做</li>
+      </ol>
+      <p class="muted">其他同意方式也算：Spectra 桌面版勾任務 0.1、Notion 卡片改「同意」後對 AI 說「看申請單」、或直接對 AI 說「同意 xxx」。</p>
+      <h3>💬 寫回饋、提需求</h3>
+      <ul>
+        <li>按「寫回饋」或「提需求」，照表單填，截圖直接拖進去</li>
+        <li>一張卡寫一件事；名詞用名詞表裡的名字</li>
+        <li>寫完對 AI 說「看回饋」或「看需求」</li>
+      </ul>
+      <h3>📱 不在電腦前，怎麼叫 AI 做事</h3>
+      <ul>
+        <li><b>Claude 手機 App ＋ Remote Control</b>：電腦上的 Claude Code 開著，手機就能看到它在做什麼、直接下指令（電腦要開機、不能睡眠）</li>
+        <li><b>這個工作台＋GitHub App</b>：看進度、同意申請單、寫回饋——不需要電腦開著</li>
+        <li>每次上線，手機會收到 ntfy 通知（專案有設定的話），點開就能試玩</li>
+      </ul>
+      <h3>💻 換一台電腦</h3>
+      <ul>
+        <li>工作台、GitHub、Notion 都在雲端，換電腦不影響</li>
+        <li>要在新電腦叫 AI 做事：照開發流 <code>05 工具與帳號</code> 的「換電腦清單」，最後對 AI 說「<b>檢查環境</b>」</li>
+      </ul>
+      <h3>狀態是什麼意思</h3>
+      <ul>
+        <li><span class="chip s-待同意">待同意</span> AI 寫好申請單，等企劃看過同意</li>
+        <li><span class="chip s-已同意">已同意</span> 可以開始做了（對 AI 說「做 xxx」）</li>
+        <li><span class="chip s-實作中">實作中</span> AI 正在照任務清單做，進度條是完成的任務數</li>
+        <li><span class="chip s-待結案">待結案</span> 任務都做完、已上線：請試玩，沒問題就說「xxx 結案」</li>
+        <li><span class="chip s-已結案">已結案</span> 規則已併回規則書</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<script>
+(() => {
+  const qs = new URLSearchParams(location.search);
+  // 看哪個 repo：網址 ?repo=帳號/名稱 優先；否則從 <帳號>.github.io/<repo>/ 推算
+  const guess = location.hostname.endsWith(".github.io") ? `${location.hostname.split(".")[0]}/${location.pathname.split("/")[1]}` : "";
+  const repo = qs.get("repo") || guess || "fishon100/game-dev-flow-template";
+  let repoUrl = `https://github.com/${repo}`; // 讀到資料後改用資料裡的 repo
+  const DATA = qs.get("data") || `https://raw.githubusercontent.com/${repo}/workbench-data/data.json`; // ?data= 給本機預覽用
+  const CACHE = `workbench:${repo}`;
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  const ago = iso => {
+    const m = Math.round((Date.now() - new Date(iso)) / 60000);
+    if (m < 1) return "剛剛"; if (m < 60) return `${m} 分鐘前`;
+    const h = Math.round(m / 60); if (h < 24) return `${h} 小時前`;
+    return `${Math.round(h / 24)} 天前`;
+  };
+  const day = iso => new Date(iso).toLocaleDateString("zh-TW", { month: "numeric", day: "numeric" });
+  const ORDER = { 待同意: 0, 待結案: 1, 實作中: 2, 已同意: 3, 已結案: 9 };
+  const short = (s, n) => { s = String(s || "").replace(/[#*`>_]/g, "").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
+  const newIssue = t => `${repoUrl}/issues/new?template=${t}.yml`;
+
+  // 分頁
+  const tabs = [...document.querySelectorAll("nav.tabs button")];
+  function show(name) {
+    tabs.forEach(b => b.setAttribute("aria-selected", b.dataset.tab === name));
+    document.querySelectorAll("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== name || !window.__data && name !== "help"));
+    store.set("workbench:tab", name);
+    if (location.hash !== "#" + name) history.replaceState(null, "", location.pathname + location.search + "#" + name);
+  }
+  tabs.forEach(b => b.addEventListener("click", () => { show(b.dataset.tab); scrollTo({ top: 0 }); }));
+
+  function changeCard(c, { compact = false } = {}) {
+    const pct = c.tasks.total ? Math.round((c.tasks.done / c.tasks.total) * 100) : 0;
+    const files = `${repoUrl}/tree/main/${window.__data.specDir}/changes/${encodeURIComponent(c.folder)}`;
+    const approve = c.status === "待同意" && c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">👍 看內容並同意</a>` : "";
+    return `<article class="card">
+      <div class="row"><span class="chip s-${esc(c.status)}">${esc(c.status)}</span>${c.breaking ? '<span class="chip lv-red">BREAKING</span>' : ""}<span class="muted">${esc(c.id)}</span></div>
+      <div class="title">${esc(c.title)}</div>
+      ${compact ? "" : `<div class="why">${esc(short(c.why, 160))}</div>`}
+      ${c.status === "待同意" && c.confirm ? `<div class="ask">❓ ${esc(short(c.confirm, 220))}</div>` : ""}
+      ${c.tasks.total ? `<div class="bar" aria-label="進度 ${pct}%"><i style="width:${pct}%"></i></div><div class="muted">任務 ${c.tasks.done}/${c.tasks.total}${c.tasks.next ? `・下一步：${esc(short(c.tasks.next, 40))}` : ""}</div>` : ""}
+      ${c.tasks.approvalNote ? `<div class="muted">✅ ${esc(c.tasks.approvalNote)}</div>` : ""}
+      ${c.status === "待結案" ? `<div class="ask">已經做完：請試玩，沒問題就對 AI 說「${esc(c.id)} 結案」</div>` : ""}
+      <div class="row" style="margin-top:10px">${approve}<a class="btn" href="${files}" target="_blank" rel="noopener">📄 完整申請單</a>${c.issue && c.status !== "待同意" ? `<a class="btn" href="${esc(c.issue.url)}" target="_blank" rel="noopener">💬 討論 ${c.issue.comments ? `(${c.issue.comments})` : ""}</a>` : ""}</div>
+    </article>`;
+  }
+  const lvClass = t => (/🔴|必修/.test(t) ? "lv-red" : /🟢|很好/.test(t) ? "lv-green" : "lv-yellow");
+  function issueItem(i) {
+    return `<li><div class="grow"><a class="t" href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a>
+      <div class="muted">#${i.number}・${esc(i.user || "")}・${day(i.created)}${i.comments ? `・💬 ${i.comments}` : ""}</div></div></li>`;
+  }
+
+  function render(d, fromCache) {
+    window.__data = d;
+    repoUrl = d.repoUrl || repoUrl;
+    document.title = `${d.name}｜開發工作台`;
+    $("#proj").textContent = `🧭 ${d.name}`;
+    $("#fresh").textContent = `${fromCache ? "離線資料・" : ""}更新於 ${ago(d.generatedAt)}`;
+    const active = d.changes.filter(c => !c.archived).sort((a, b) => ORDER[a.status] - ORDER[b.status]);
+    const archived = d.changes.filter(c => c.archived);
+    const waiting = active.filter(c => c.status === "待同意");
+    const toClose = active.filter(c => c.status === "待結案");
+    const fbOpen = d.feedback.filter(i => i.state === "open");
+    const rqOpen = d.requests.filter(i => i.state === "open");
+    const lastRun = d.runs[0];
+
+    // 首頁：需要你處理
+    const todo = [];
+    waiting.forEach(c => todo.push(`<div class="row"><span class="grow" style="flex:1">📝 <b>${esc(c.title)}</b> 等你同意</span>${c.issue ? `<a class="btn" style="background:#fff;color:#3b2a99;min-height:40px" href="${esc(c.issue.url)}" target="_blank" rel="noopener">看內容並同意</a>` : ""}</div>`));
+    toClose.forEach(c => todo.push(`<div>🎮 <b>${esc(c.title)}</b> 做完了：試玩後說「${esc(c.id)} 結案」</div>`));
+    if (fbOpen.length) todo.push(`<div>💬 有 <b>${fbOpen.length}</b> 則回饋還沒處理：對 AI 說「看回饋」</div>`);
+    if (lastRun && lastRun.conclusion === "failure") todo.push(`<div>⚠️ 最近一次「${esc(lastRun.name)}」失敗了：<a href="${esc(lastRun.url)}" target="_blank" rel="noopener">看原因</a>，或對 AI 說「部署失敗了，幫我看」</div>`);
+    $("#todo").innerHTML = `<div class="row"><span class="num">${waiting.length + toClose.length}</span><span>件事需要你處理</span></div>` +
+      (todo.length ? todo.join("") : `<div>目前沒有等你的事 🎉 可以去試玩最新版本，或丟新想法到需求。</div>`);
+
+    const quick = [
+      ...d.links.map(l => `<a class="btn ${/試玩/.test(l.label) ? "primary" : ""}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`),
+      `<a class="btn" href="${newIssue("feedback")}" target="_blank" rel="noopener">🎮 寫回饋</a>`,
+      `<a class="btn" href="${newIssue("request")}" target="_blank" rel="noopener">💡 提需求</a>`,
+    ].join("");
+    $("#quick").innerHTML = quick;
+    $("#quick2").innerHTML = `<a class="btn primary" href="${newIssue("feedback")}" target="_blank" rel="noopener">🎮 寫回饋</a><a class="btn" href="${newIssue("request")}" target="_blank" rel="noopener">💡 提需求</a>`;
+
+    $("#stats").innerHTML = [
+      [active.length, "進行中申請單"], [archived.length, "已結案"], [d.specs.length, "份規則書"],
+      [lastRun ? (lastRun.conclusion === "success" ? "✅" : lastRun.conclusion === "failure" ? "❌" : "⏳") : "—", "最近上線"],
+    ].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join("");
+
+    $("#home-active").innerHTML = active.length ? active.map(c => changeCard(c, { compact: true })).join("") : `<div class="card empty">沒有進行中的申請單。新想法寫在「提需求」，再對 AI 說「看需求」。</div>`;
+    $("#ch-active").innerHTML = active.length ? active.map(c => changeCard(c)).join("") : `<div class="card empty">沒有進行中的申請單。</div>`;
+    $("#ch-archived-n").textContent = `${archived.length} 張`;
+    $("#ch-archived").innerHTML = archived.map(c => `<li><span class="chip s-已結案">${esc(c.date.slice(5).replace("-", "/"))}</span><div class="grow"><a class="t" href="${repoUrl}/tree/main/${d.specDir}/changes/archive/${encodeURIComponent(c.folder)}" target="_blank" rel="noopener">${esc(c.title)}</a><div class="muted">${esc(c.id)}・任務 ${c.tasks.done}/${c.tasks.total}</div></div></li>`).join("") || `<li class="empty">還沒有</li>`;
+
+    $("#fb-open").innerHTML = fbOpen.map(i => issueItem(i).replace('<div class="grow">', `<span class="chip ${lvClass(i.title + i.labels.join())}">${/🔴|必修/.test(i.title) ? "必修" : /🟢|很好/.test(i.title) ? "很好" : "回饋"}</span><div class="grow">`)).join("") || `<li class="empty">沒有未處理的回饋 👍</li>`;
+    $("#rq-open").innerHTML = rqOpen.map(issueItem).join("") || `<li class="empty">沒有未處理的需求</li>`;
+    $("#iss-closed").innerHTML = [...d.feedback, ...d.requests].filter(i => i.state !== "open").map(issueItem).join("") || `<li class="empty">還沒有</li>`;
+
+    $("#specs").innerHTML = d.specs.map(s => `<li><div class="grow"><a class="t" href="${repoUrl}/blob/main/${d.specDir}/specs/${encodeURIComponent(s.name)}/spec.md" target="_blank" rel="noopener">${esc(s.name)}</a><div class="muted">${esc(short(s.purpose, 90))}</div></div><span class="chip s-已同意">${s.requirements} 條</span></li>`).join("") || `<li class="empty">還沒有規則書</li>`;
+
+    const runItem = r => `<li><span class="dot ${r.conclusion === "success" ? "ok" : r.conclusion === "failure" ? "bad" : "run"}"></span><div class="grow"><a class="t" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.name)}</a><div class="muted">${esc(r.name)}・${r.conclusion === "success" ? "成功" : r.conclusion === "failure" ? "失敗" : "進行中"}・${ago(r.date)}</div></div></li>`;
+    $("#home-runs").innerHTML = d.runs.slice(0, 3).map(runItem).join("") || `<li class="empty">還沒有紀錄</li>`;
+    $("#runs").innerHTML = d.runs.map(runItem).join("") || `<li class="empty">還沒有紀錄</li>`;
+    $("#commits").innerHTML = d.commits.map(c => `<li><div class="grow"><a class="t" href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.subject)}</a><div class="muted">${esc(c.author)}・${ago(c.date)}</div></div></li>`).join("");
+
+    tabs.find(b => b.dataset.tab === "home").innerHTML = `🏠 首頁${waiting.length + toClose.length ? `<span class="badge">${waiting.length + toClose.length}</span>` : ""}`;
+    tabs.find(b => b.dataset.tab === "issues").innerHTML = `💬 回饋與需求${fbOpen.length ? `<span class="badge">${fbOpen.length}</span>` : ""}`;
+    $("#status").hidden = true;
+    show((location.hash.slice(1)) || store.get("workbench:tab") || "home");
+  }
+
+  async function load() {
+    $("#reload").disabled = true;
+    try {
+      const r = await fetch(`${DATA}?t=${Date.now()}`, { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status === 404 ? "這個專案還沒有工作台資料（第一次要等 GitHub Actions 的 workbench 跑完）" : `讀取失敗（${r.status}）`);
+      const d = await r.json();
+      store.set(CACHE, JSON.stringify(d));
+      render(d, false);
+    } catch (e) {
+      const cached = store.get(CACHE);
+      if (cached) { render(JSON.parse(cached), true); }
+      else { const s = $("#status"); s.hidden = false; s.className = "card err"; s.innerHTML = `${esc(e.message)}<br><a href="${repoUrl}/actions" target="_blank" rel="noopener">看 GitHub Actions</a>`; show("help"); }
+    } finally { $("#reload").disabled = false; }
+  }
+  $("#reload").addEventListener("click", load);
+  addEventListener("hashchange", () => { const t = location.hash.slice(1); if (tabs.some(b => b.dataset.tab === t)) show(t); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && window.__data && Date.now() - new Date(window.__data.generatedAt) > 60000) load(); });
+  load();
+})();
+</script>
+</body>
+</html>

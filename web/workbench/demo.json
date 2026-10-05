@@ -1,0 +1,454 @@
+{
+ "generatedAt": "2026-10-05T16:16:00.943Z",
+ "repo": "fishon100/pinball-sling",
+ "repoUrl": "https://github.com/fishon100/pinball-sling",
+ "specDir": "docs/spectra",
+ "name": "噴漆闖關 SPRAY RUN（示範資料）",
+ "links": [
+  {
+   "label": "▶ 試玩",
+   "url": "https://fishon100.github.io/pinball-sling/street/"
+  }
+ ],
+ "changes": [
+  {
+   "id": "paddle-trail",
+   "folder": "paddle-trail",
+   "archived": false,
+   "date": "",
+   "title": "滑板加噴漆拖尾",
+   "why": "企劃試玩覺得滑板移動時沒有速度感，看不出自己移動多快。",
+   "what": "- 滑板移動時留下 0.2 秒的噴漆拖尾",
+   "confirm": "- 拖尾顏色要跟街區配色嗎？\n- 手機上會不會太花？",
+   "breaking": false,
+   "capabilities": [
+    "paddle-control"
+   ],
+   "tasks": {
+    "total": 5,
+    "done": 0,
+    "hasApprovalItem": true,
+    "approved": false,
+    "approvalNote": "",
+    "next": "1.1 先寫會失敗的測試"
+   },
+   "status": "待同意",
+   "issue": {
+    "number": 12,
+    "url": "https://github.com/fishon100/pinball-sling/issues",
+    "state": "open",
+    "comments": 0
+   }
+  },
+  {
+   "id": "boss-hp-bar",
+   "folder": "boss-hp-bar",
+   "archived": false,
+   "date": "",
+   "title": "首領血條改成分段",
+   "why": "企劃試玩覺得滑板移動時沒有速度感，看不出自己移動多快。",
+   "what": "- 滑板移動時留下 0.2 秒的噴漆拖尾",
+   "confirm": "",
+   "breaking": false,
+   "capabilities": [
+    "paddle-control"
+   ],
+   "tasks": {
+    "total": 6,
+    "done": 4,
+    "hasApprovalItem": true,
+    "approved": true,
+    "approvalNote": "企劃於 GitHub Issue #10 同意，2026-10-06",
+    "next": "2.2 手機版面測試"
+   },
+   "status": "實作中",
+   "issue": {
+    "number": 10,
+    "url": "https://github.com/fishon100/pinball-sling/issues",
+    "state": "open",
+    "comments": 2
+   }
+  },
+  {
+   "id": "short-tables-all-districts",
+   "folder": "2026-10-05-short-tables-all-districts",
+   "archived": true,
+   "date": "2026-10-05",
+   "title": "全部矮台面、鏡頭固定",
+   "why": "企劃試玩發現：第 2～5 區台面比較高，鏡頭會跟著球一直上下移動，玩家很難操作、也會煩躁。更根本的問題是：球從高處掉下來時，鏡頭要先追回底部，玩家常常來不及反應球就掉了。所以所有區的台面都要跟第 1 區一樣矮，鏡頭完全不捲動。\n\n但「台面越高越難」原本是後面街區的主要難度來源。先做實驗（擬人新手、滑板、每區 9 關 × 2 局）：台面全部變矮後，第 3～5 區每關掉的愛心從 0.83 降到 0.28～0.61，每關秒數從 82～118 秒降到 24～34 秒，難度曲線變平。企劃決定改用其他方式維持「越後面越難」。",
+   "what": "- 50 關全部用矮台面（跟第 1 區一樣，一個畫面看完），遊玩時鏡頭固定不捲動\n- 第 2～5 區的台面配置重新擺：彈跳柱（中柱）越後面越少\n- 球越後面越小：第 3 區起變小，第 4、5 區更小（半徑 12／12／11／10.5／10.5，量測後定案）\n- 第 4、5 區一般關卡也用小滑板（小滑板寬度 80 → 96，量測後定案）\n- 第 4、5 區磚塊變硬：拿掉 v3.5.5 為了高台面而做的「第 4、5 區少 1 血」（原本規劃第 3～5 區再 +1 血，量測太難不採用）\n- 新元件「加速帶」：像瑪利歐賽車那樣，球往上經過時會被加速；第 3 區起出現\n- 球的軌跡提示越後面越少：彈道預覽線與落點圈只留在第 1、2 區；球的拖尾光第 3 區剩一半、第 4、5 區沒有\n- 第 2～5 區也訂出難度目標，用擬人玩家量測並寫成自動測試",
+   "confirm": "",
+   "breaking": false,
+   "capabilities": [
+    "art-presentation",
+    "bricks-and-stages",
+    "core-game-loop",
+    "difficulty-balance",
+    "newbie-assist",
+    "paddle-control",
+    "table-layout"
+   ],
+   "tasks": {
+    "total": 12,
+    "done": 12,
+    "hasApprovalItem": false,
+    "approved": false,
+    "approvalNote": "",
+    "next": ""
+   },
+   "status": "已結案"
+  },
+  {
+   "id": "level-config-table",
+   "folder": "2026-10-05-level-config-table",
+   "archived": true,
+   "date": "2026-10-05",
+   "title": "關卡改由企劃的關卡設定表決定",
+   "why": "現在每一關的磚塊圖案、磚血、道具磚數量、台面配置、滑板與球的大小、首領數值，全部由程式裡的公式自動產生（`SR.buildStage`、`SR.layoutFor`、`SR.paddleSizeFor`…）。企劃想調某一關，只能請 AI 改公式，而且一改就影響很多關。正式的遊戲開發是由企劃逐關調配，所以要把這些數值搬到企劃自己能編輯的「關卡設定表」，程式只負責照表演出。",
+   "what": "- 新增 **關卡設定表**（Google 試算表，放在團隊的 Google Drive）：一關一列，企劃逐關填寫磚塊圖案、道具、難度元件、首領數值\n- 新增 **磚塊圖案編輯器**（網頁）：在 9 欄格子上點選畫出這一關的磚（血量 1～5、油漆桶、道具磚），畫好複製回試算表\n- 遊戲改成讀關卡設定表的匯出檔（`web/street/levels.json`），不再用公式產生關卡\n- 企劃說「**同步關卡表**」：AI 讀試算表 → 檢查「不能壞掉的規則」（不卡球、柱子不貼磚、磚放得進台面、首領打得倒、數值在合理範圍）→ 跑測試 → 部署\n- 第一版關卡表 = 目前遊戲的 50 關，換成讀表後遊戲玩起來完全一樣\n- **BREAKING** 難度目標（第 1 區新手每關 ≤ 1 顆、每區越來越難）改成「只報告、不擋部署」，難度由企劃試玩判斷",
+   "confirm": "",
+   "breaking": true,
+   "capabilities": [
+    "art-presentation",
+    "boss-mr-grey",
+    "bricks-and-stages",
+    "core-game-loop",
+    "difficulty-balance",
+    "level-config",
+    "newbie-assist",
+    "paddle-control",
+    "table-layout"
+   ],
+   "tasks": {
+    "total": 14,
+    "done": 14,
+    "hasApprovalItem": false,
+    "approved": false,
+    "approvalNote": "",
+    "next": ""
+   },
+   "status": "已結案"
+  },
+  {
+   "id": "layout-editor",
+   "folder": "2026-10-05-layout-editor",
+   "archived": true,
+   "date": "2026-10-05",
+   "title": "關卡編輯器加台面模式",
+   "why": "關卡設定表上線後，磚牆可以用編輯器畫，但台面上的彈力牆、中柱、加速帶、阿鰭還是只能在「台面配置表」填座標（例如「78,664; 282,664」）。企劃很難想像座標對應到哪裡，也不知道放了會不會貼到磚或卡球。企劃要求這些也要能直接編輯。",
+   "what": "- 磚塊圖案編輯器加一個「台面」模式，在台面上直接操作：\n  - **中柱**：點一下新增、拖曳移動、選取後刪除；預設左右對稱（放一顆左邊的、右邊自動出現一顆），可以關掉\n  - **彈力牆**：新增一段、拖曳兩端改長度和角度、整段拖曳移動、刪除\n  - **加速帶**：新增、拖曳移動、刪除\n  - **阿鰭的游泳路線**：新增或拿掉阿鰭；拖曳改高度和左右範圍；速度用數字輸入\n- 即時提醒：中柱、阿鰭、加速帶離磚太近（用這個台面的每一關都檢查）、超出台面、太靠近滑板；按「檢查卡球」會跑跟同步時一樣的卡球檢查\n- 共用台面：顯示「這個台面用在第幾關」，可以選「直接改（影響這些關）」或「另存成新台面」（取新代號，只給這一關用）\n- 「複製」：複製成台面配置表的一列（代號、名稱、中柱、阿鰭、彈力牆、加速帶），貼回試算表；另存新台面時會提醒到關卡設定表把這一關的「台面配置」改成新代號",
+   "confirm": "",
+   "breaking": false,
+   "capabilities": [
+    "level-config"
+   ],
+   "tasks": {
+    "total": 8,
+    "done": 8,
+    "hasApprovalItem": false,
+    "approved": false,
+    "approvalNote": "",
+    "next": ""
+   },
+   "status": "已結案"
+  },
+  {
+   "id": "item-capsules",
+   "folder": "2026-10-05-item-capsules",
+   "archived": true,
+   "date": "2026-10-05",
+   "title": "道具改成掉落膠囊",
+   "why": "道具欄放在台面下方會擠壓台面（申請單 `fix-item-bar-covers-table` 修過一次），而且玩家要一邊接球一邊去按下面的按鈕，操作分心。企劃決定改成經典打磚塊的做法：道具藏在磚塊裡，打破後道具會掉下來，用滑板接到就馬上生效。這樣遊玩畫面上不需要道具欄，台面永遠是最大的。",
+   "what": "- 道具磚：第 2 關起每關 2～3 塊（第 1 關是教學關，不放），首領關也有\n- 打破道具磚，會掉下一顆「道具膠囊」（上面是道具圖示），直直往下掉\n- 用滑板（經典擋板模式：擋板）接到膠囊，就立刻用掉這個道具；沒接到就消失\n- 5 種道具的效果不變（漆彈、慢動作、球保險、加一顆、寬板）\n- **BREAKING** 拿掉道具欄與道具庫存：道具不再存起來帶到下一關；打完一區送 2 個道具的「街區獎勵」也拿掉；舊存檔裡的道具不再使用",
+   "confirm": "",
+   "breaking": true,
+   "capabilities": [
+    "bricks-and-stages",
+    "core-game-loop",
+    "power-ups-and-items"
+   ],
+   "tasks": {
+    "total": 8,
+    "done": 8,
+    "hasApprovalItem": false,
+    "approved": false,
+    "approvalNote": "",
+    "next": ""
+   },
+   "status": "已結案"
+  },
+  {
+   "id": "fix-plunger-moves-paddle",
+   "folder": "2026-10-05-fix-plunger-moves-paddle",
+   "archived": true,
+   "date": "2026-10-05",
+   "title": "拉發射桿時滑板跟著跑",
+   "why": "滑板模式下，球在發射道時按住畫面往下拉發射桿，滑板也會跟著手指（或滑鼠）左右移動。玩家只是想發射，滑板卻被拉走，發射後常常接不到第一球。",
+   "what": "正在拉發射桿的那根手指（或滑鼠）不控制滑板：按下開始拉桿時不移動滑板，拉的過程中移動也不帶動滑板。放開（發射或沒拉夠）之後，滑板恢復跟著指標走。其他手指（多指觸控）仍然可以控制滑板。",
+   "confirm": "",
+   "breaking": false,
+   "capabilities": [
+    "paddle-control"
+   ],
+   "tasks": {
+    "total": 3,
+    "done": 3,
+    "hasApprovalItem": false,
+    "approved": false,
+    "approvalNote": "",
+    "next": ""
+   },
+   "status": "已結案"
+  },
+  {
+   "id": "fix-item-bar-covers-table",
+   "folder": "2026-10-05-fix-item-bar-covers-table",
+   "archived": true,
+   "date": "2026-10-05",
+   "title": "手機上道具欄蓋住台面",
+   "why": "手機上，道具欄出現後會蓋住台面最下面一段（約 30 px），剛好是發射桿和滑板線的位置，畫面變得很擠、看不清楚；道具按鈕的名字也被擠成兩行（例如「慢動／作」）。",
+   "what": "- 台面所在區域的大小一改變（包含道具欄出現或消失）就重新計算台面大小，台面永遠不會跟上方資訊列或下方道具欄重疊\n- 道具欄改成精簡的一行：圖示＋名字不換行、按鈕變矮，把空間留給台面",
+   "confirm": "",
+   "breaking": false,
+   "capabilities": [
+    "power-ups-and-items"
+   ],
+   "tasks": {
+    "total": 4,
+    "done": 4,
+    "hasApprovalItem": false,
+    "approved": false,
+    "approvalNote": "",
+    "next": ""
+   },
+   "status": "已結案"
+  },
+  {
+   "id": "fix-baseline-bugs",
+   "folder": "2026-10-05-fix-baseline-bugs",
+   "archived": true,
+   "date": "2026-10-05",
+   "title": "修 4 個 bug（空白鍵、音效、從頭再打、跳過漫畫）",
+   "why": "盤點現有遊戲（申請單 `baseline-specs`）時發現 4 個 bug，企劃決定全部修正：\n\n1. 電腦上按住空白鍵拉發射桿，常常拉不滿、甚至發射不出去\n2. 音效、音樂開關重新整理後不會記住，每次都回到「開」\n3. 已經全破的街區，地圖上的「從頭再打一次」會從第 10 關（首領關）開始\n4. 第一次看漫畫時按「跳過」，也被記成「看過」，之後不會再自動播放",
+   "what": "1. 空白鍵的重送訊號不再重新拉桿；按住會一路拉滿\n2. 開關狀態寫進存檔（`save.sfx`、`save.music`），開遊戲時套用\n3. 全破的街區按「從頭再打一次」從該區第 1 關開始；其他情況維持原本公式\n4. 漫畫完整看完才記成「看過」；按跳過不記，下次還會自動播放",
+   "confirm": "",
+   "breaking": false,
+   "capabilities": [
+    "audio-and-haptics",
+    "comics-and-story-replay",
+    "game-ui",
+    "plunger-launch"
+   ],
+   "tasks": {
+    "total": 10,
+    "done": 10,
+    "hasApprovalItem": false,
+    "approved": false,
+    "approvalNote": "",
+    "next": ""
+   },
+   "status": "已結案"
+  },
+  {
+   "id": "baseline-specs",
+   "folder": "2026-10-05-baseline-specs",
+   "archived": true,
+   "date": "2026-10-05",
+   "title": "把現有遊戲寫成 16 份規則書",
+   "why": "噴漆闖關目前的規則散在 Obsidian 的主架構規劃書與 F01～F15 功能規劃書，只有企劃這台電腦看得到，也沒有逐條對應到自動測試。團隊要改用 Spectra 的「申請單」流程，第一步必須先把「遊戲現在已經是這樣」寫成正式規則書，之後每張申請單才有比對的基準。",
+   "what": "- 把主架構規劃書與 F01～F15 的現有行為，寫成 16 份 Spectra 規則書（每份一個功能）\n- 每條規則都寫成「當……就要……」的情境，並標出目前由哪一個自動測試檢查\n- 找出還沒有測試的情境，補上測試或寫明為什麼不用測（例如純外觀）\n- 遊戲行為完全不改；只新增規則書與缺少的測試",
+   "confirm": "",
+   "breaking": false,
+   "capabilities": [
+    "art-presentation",
+    "audio-and-haptics",
+    "boss-mr-grey",
+    "bricks-and-stages",
+    "comics-and-story-replay",
+    "core-game-loop",
+    "difficulty-balance",
+    "flipper-control",
+    "game-ui",
+    "medals-and-achievements",
+    "newbie-assist",
+    "opening-animation",
+    "paddle-control",
+    "plunger-launch",
+    "power-ups-and-items",
+    "table-layout"
+   ],
+   "tasks": {
+    "total": 9,
+    "done": 9,
+    "hasApprovalItem": false,
+    "approved": false,
+    "approvalNote": "",
+    "next": ""
+   },
+   "status": "已結案"
+  }
+ ],
+ "specs": [
+  {
+   "name": "art-presentation",
+   "purpose": "所有關卡玩的時候鏡頭都固定不動，整個台面、滑板／擋板一直都看得到；只有開場和過關演出會短暫運鏡，結束後回到原位。",
+   "requirements": 5,
+   "scenarios": 7
+  },
+  {
+   "name": "audio-and-haptics",
+   "purpose": "音效和音樂可以在暫停選單（音樂也能在標題）開關，馬上生效，而且會記在存檔裡，重新整理後維持你選的設定。",
+   "requirements": 5,
+   "scenarios": 6
+  },
+  {
+   "name": "boss-mr-grey",
+   "purpose": "首領出現在關卡表標 X 的那一排，血量、速度、補磚間隔都照關卡表；第一版的數值跟原本一樣。",
+   "requirements": 6,
+   "scenarios": 11
+  },
+  {
+   "name": "bricks-and-stages",
+   "purpose": "遊戲有 5 區 × 10 關共 50 關，每區第 10 關是首領關；每一關照關卡設定表建立，表不變磚就不變。",
+   "requirements": 6,
+   "scenarios": 11
+  },
+  {
+   "name": "comics-and-story-replay",
+   "purpose": "每一格依序出現：先框和背景，再角色一個一個跳出來，再旁白，最後對話框，字像打字機一樣一個一個出來。",
+   "requirements": 6,
+   "scenarios": 13
+  },
+  {
+   "name": "core-game-loop",
+   "purpose": "玩家從地圖選關 → 看漫畫 → 關卡開場 → 開打 → 過關演出 → 結算畫面，結算後可以選「重玩／下一關／回地圖」；首領關打完會到「街區解放」畫面，第 50 關打完看結局。",
+   "requirements": 8,
+   "scenarios": 25
+  },
+  {
+   "name": "difficulty-balance",
+   "purpose": "用「像人」的自動玩家量難度：新手、普通、熟練三種，反應時間和瞄準誤差不同，不用機器的完美手速。",
+   "requirements": 7,
+   "scenarios": 10
+  },
+  {
+   "name": "flipper-control",
+   "purpose": "經典擋板模式點左半邊／右半邊（電腦 Z、← 或 /、→）控制左右擋板；球在發射道時，按右半邊是拉發射桿，不是揮右擋板。",
+   "requirements": 7,
+   "scenarios": 15
+  },
+  {
+   "name": "game-ui",
+   "purpose": "第一次打開遊戲先看投幣開場（約 7 秒，可跳過），之後直接到標題；標題可以開始、看成就、開關音樂、重看開場、換操作方式。",
+   "requirements": 6,
+   "scenarios": 12
+  },
+  {
+   "name": "level-config",
+   "purpose": "50 關全部照「關卡設定表」和「台面配置表」（同步後的 levels.js）來建；程式裡的公式只留著當第一版和參考用。",
+   "requirements": 7,
+   "scenarios": 15
+  },
+  {
+   "name": "medals-and-achievements",
+   "purpose": "過關獎牌只看這關掉了幾顆愛心：沒掉＝金牌、掉 1 顆＝銀牌、掉 2 顆以上或有續關＝銅牌。",
+   "requirements": 5,
+   "scenarios": 9
+  },
+  {
+   "name": "newbie-assist",
+   "purpose": "每關的輔助看關卡表（預覽秒數、落點提示、加長球保險、收尾輔助）；地圖卡片寫出這一區第一關的輔助，都沒有就顯示「沒有輔助：全靠你的手感」。",
+   "requirements": 6,
+   "scenarios": 14
+  },
+  {
+   "name": "opening-animation",
+   "purpose": "第一次打開遊戲會自動播開場，看完或跳過後記在存檔裡，之後打開直接到標題。",
+   "requirements": 5,
+   "scenarios": 11
+  },
+  {
+   "name": "paddle-control",
+   "purpose": "滑板跟著滑鼠（不用點，移出畫面也跟）、手指或方向鍵移動；正在拉發射桿的那根手指不會帶動滑板，放開後才恢復；滑板追目標的速度最快每秒 2600 px，遊玩中滑鼠游標會藏起來。",
+   "requirements": 5,
+   "scenarios": 15
+  },
+  {
+   "name": "plunger-launch",
+   "purpose": "只有球停在發射道底部時才能拉發射桿；等待時下方提示會告訴玩家怎麼拉。",
+   "requirements": 6,
+   "scenarios": 15
+  },
+  {
+   "name": "power-ups-and-items",
+   "purpose": "一般關卡過關會直接隨機拿到一罐強化（已滿級的不會抽到），首領關不給；強化只在這一輪有效，回地圖重新開始就清空。",
+   "requirements": 5,
+   "scenarios": 14
+  },
+  {
+   "name": "table-layout",
+   "purpose": "50 關全部用矮台面，跟第 1 區一樣一個畫面就看完。",
+   "requirements": 8,
+   "scenarios": 16
+  }
+ ],
+ "requests": [
+  {
+   "number": 14,
+   "title": "需求：加每日挑戰關卡",
+   "url": "#",
+   "state": "open",
+   "created": "2026-10-05T16:16:00.943Z",
+   "user": "sandyweng",
+   "labels": [
+    "需求"
+   ],
+   "comments": 1
+  }
+ ],
+ "feedback": [
+  {
+   "number": 13,
+   "title": "回饋：🔴 第 5 關球卡在右上角",
+   "url": "#",
+   "state": "open",
+   "created": "2026-10-05T16:16:00.943Z",
+   "user": "sandyweng",
+   "labels": [
+    "回饋"
+   ],
+   "comments": 1
+  },
+  {
+   "number": 11,
+   "title": "回饋：🟢 噴漆特效很爽",
+   "url": "#",
+   "state": "closed",
+   "created": "2026-10-05T16:16:00.943Z",
+   "user": "sandyweng",
+   "labels": [
+    "回饋"
+   ],
+   "comments": 1
+  }
+ ],
+ "commits": [
+  {
+   "sha": "d9afedc",
+   "date": "2026-10-05T16:16:00.943Z",
+   "author": "fishon100",
+   "subject": "同步計劃：回到自己的 Claude 帳號後要執行的步驟",
+   "url": "#"
+  }
+ ],
+ "runs": [
+  {
+   "name": "test-and-deploy",
+   "status": "completed",
+   "conclusion": "success",
+   "date": "2026-10-05T16:16:00.943Z",
+   "url": "#",
+   "title": "v3.7.3 關卡編輯器加台面模式"
+  }
+ ]
+}
