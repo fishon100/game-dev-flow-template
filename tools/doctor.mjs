@@ -33,7 +33,7 @@ const skills = existsSync(".claude/skills") ? readdirSync(".claude/skills").filt
 check("Spectra skills（/spectra-* 指令）", skills.length >= 10, `${skills.length} 個`, "在專案資料夾執行 spxa init --tools claude");
 check("Spectra 設定檔", existsSync(".spectra.yaml"), existsSync(".spectra.yaml") ? "有" : "沒有", "spxa init --tools claude");
 
-const hasNodeTests = existsSync("tests") && readdirSync("tests").some(f => /.test.(mjs|js)$/.test(f));
+const hasNodeTests = existsSync("tests") && readdirSync("tests").some(f => /\.test\.(mjs|js)$/.test(f));
 const tests = hasNodeTests ? run("node --test 2>&1") : "";
 const pass = tests && (tests.match(/# pass (\d+)/) || [])[1], fail = tests && (tests.match(/# fail (\d+)/) || [])[1];
 if (hasNodeTests) check("自動測試", tests !== null && fail === "0", tests === null ? "有測試失敗" : `${pass} 項通過、${fail} 項失敗`, "對 AI 說「測試沒過，幫我看」");

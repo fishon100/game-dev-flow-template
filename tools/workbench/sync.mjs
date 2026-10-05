@@ -99,7 +99,11 @@ const commits = execSync('git log -15 --date=iso-strict --pretty=format:%H%x1f%a
   .split("\n").filter(Boolean).map(l => { const [sha, date, author, subject] = l.split("\x1f"); return { sha: sha.slice(0, 7), date, author, subject, url: `${repoUrl}/commit/${sha}` }; });
 const runs = (await gh("/actions/runs?per_page=20").catch(() => ({ workflow_runs: [] }))).workflow_runs
   .filter(r => r.name !== "workbench").slice(0, 5)
-  .map(r => ({ name: r.name, status: r.status, conclusion: r.conclusion, date: r.created_at, url: r.html_url, title: r.display_title }));
+  .map(r => ({
+    name: { "test-and-deploy": "自動測試＋部署", "pages build and deployment": "網站部署" }[r.name] || r.name,
+    status: r.status, conclusion: r.conclusion, date: r.created_at, url: r.html_url,
+    title: (r.head_commit?.message || r.display_title || "").split("\n")[0],
+  }));
 const { specs } = readSpectra(root, specDir);
 const data = {
   generatedAt: new Date().toISOString(),
