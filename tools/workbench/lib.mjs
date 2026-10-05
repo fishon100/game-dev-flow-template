@@ -1,4 +1,4 @@
-// 工作台共用：讀 Spectra 的申請單與規則書，整理成工作台要的資料。純函式＋讀檔，Node 與測試都用它。
+// 工作台共用：讀 Spectra 的提案與規則書，整理成工作台要的資料。純函式＋讀檔，Node 與測試都用它。
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -67,12 +67,12 @@ export function parseProposal(md, fallbackName) {
   };
 }
 
-/** 申請單狀態（給人看的中文） */
+/** 提案狀態（給人看的中文） */
 export function statusOf({ archived, tasks }) {
-  if (archived) return "已結案";
+  if (archived) return "已完成";
   if (tasks.hasApprovalItem && !tasks.approved) return "待同意";
-  if (tasks.total > 0 && tasks.done === tasks.total) return "待結案";
-  if (tasks.done > 0) return "實作中";
+  if (tasks.total > 0 && tasks.done === tasks.total) return "待驗收";
+  if (tasks.done > 0) return "製作中";
   return tasks.hasApprovalItem ? "已同意" : "待同意";
 }
 
@@ -106,7 +106,7 @@ export function readSpectra(root, specDir = "docs/spectra") {
   return { changes: [...active, ...archived], specs };
 }
 
-/** 申請單 Issue 的內文（給企劃在手機上看、勾選） */
+/** 提案 Issue 的內文（給企劃在手機上看、勾選） */
 export function approvalIssueBody(c, repoUrl, specDir = "docs/spectra") {
   const link = `${repoUrl}/tree/main/${specDir}/changes/${c.folder}`;
   const cut = (s, n) => (s.length > n ? s.slice(0, n) + "…" : s);
@@ -119,13 +119,14 @@ export function approvalIssueBody(c, repoUrl, specDir = "docs/spectra") {
     cut(c.what || "（proposal.md 沒有寫）", 1500),
     ``,
     c.confirm ? `### ❓ 需要企劃確認的事\n${cut(c.confirm, 1200)}\n` : "",
-    c.breaking ? `> ⚠️ 這張申請單有 **BREAKING**：會拿掉或改變玩家已經習慣的東西。\n` : "",
+    c.breaking ? `> ⚠️ 這張提案有 **BREAKING**：會拿掉或改變玩家已經習慣的東西。\n` : "",
     `---`,
-    `**看完沒問題就勾下面這格**（手機 GitHub App 也可以勾）。勾完幾十秒後，申請單的任務 0.1 會自動打勾，AI 才會開始做。`,
+    `**看完沒問題就勾下面這格**（手機 GitHub App 也可以勾）。勾完幾十秒後，提案的任務 0.1 會自動打勾。`,
+    `之後在管理台按「交給 AI 製作」，或在下面留言 \`@claude 開工\`，AI 就會在 GitHub 上開始做（做完會開 PR 給程式審查）。`,
     ``,
     `- [ ] 企劃同意`,
     ``,
-    `有意見？直接在下面留言，AI 會照意見修改申請單。`,
+    `有意見？直接在下面留言；想讓 AI 照意見改提案，留言開頭加 \`@claude\`。`,
     `完整內容：${link}`,
   ].filter(l => l !== "").join("\n").replace(/\n(### )/g, "\n\n$1");
 }

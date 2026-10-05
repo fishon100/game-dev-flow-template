@@ -1,7 +1,7 @@
 // 工作台同步（GitHub Actions 執行；本機要跑需設 GITHUB_TOKEN、GITHUB_REPOSITORY）
 //  1. Issue 裡勾了「企劃同意」→ 把 tasks.md 的 0.1 打勾並註明來源（之後由 workflow commit）
-//  2. 每張待同意的申請單都有一個「申請單」Issue（沒有就開，企劃在手機就能看、能勾）
-//  3. 已同意的 Issue 貼「已同意」標籤；已結案的申請單把 Issue 關掉
+//  2. 每張待同意的提案都有一個「提案」Issue（沒有就開，企劃在手機就能看、能勾）
+//  3. 已同意的 Issue 貼「已同意」標籤；已完成的提案把 Issue 關掉
 //  4. 產生工作台資料 workbench-out/data.json（由 workflow 推到 workbench-data 分支）
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -27,10 +27,10 @@ async function gh(path, init = {}) {
 }
 const post = (p, body, method = "POST") => gh(p, { method, body: JSON.stringify(body) });
 
-const LABELS = { 申請單: "5319e7", 已同意: "0e8a16", 需求: "1d76db", 回饋: "d93f0b" };
+const LABELS = { 提案: "5319e7", 已同意: "0e8a16", 需求: "1d76db", 回饋: "d93f0b" };
 for (const [name, color] of Object.entries(LABELS)) await post("/labels", { name, color }); // 已存在會回 422，忽略
 
-// ---- 1. 同意：任何一個申請單 Issue 勾了「企劃同意」，就把 tasks.md 0.1 打勾 ----
+// ---- 1. 同意：任何一個提案 Issue 勾了「企劃同意」，就把 tasks.md 0.1 打勾 ----
 const allIssues = (await gh("/issues?state=all&per_page=100")).filter(i => !i.pull_request);
 const changed = [];
 let { changes } = readSpectra(root, specDir);
@@ -53,12 +53,12 @@ for (const issue of allIssues) {
     continue;
   }
   if (hasLabel(issue, "已同意")) {
-    // 申請單改過、0.1 被取消：請企劃重新確認
+    // 提案改過、0.1 被取消：請企劃重新確認
     await setBox(issue, false);
     await gh(`/issues/${issue.number}/labels/${encodeURIComponent("已同意")}`, { method: "DELETE" }).catch(() => {});
     issue.labels = issue.labels.filter(l => (l.name || l) !== "已同意");
     await post(`/issues/${issue.number}`, { body: approvalIssueBody(c, repoUrl, specDir) }, "PATCH");
-    await post(`/issues/${issue.number}/comments`, { body: `🔄 申請單 \`${c.id}\` 有修改，已把「企劃同意」取消。請看上面更新後的內容，沒問題再勾一次。` });
+    await post(`/issues/${issue.number}/comments`, { body: `🔄 提案 \`${c.id}\` 有修改，已把「企劃同意」取消。請看上面更新後的內容，沒問題再勾一次。` });
     console.log(`重新確認：${c.id}（Issue #${issue.number}）`);
     continue;
   }
@@ -67,38 +67,45 @@ for (const issue of allIssues) {
   writeFileSync(f, approveTasks(readFileSync(f, "utf8"), `企劃於 GitHub Issue #${issue.number} 同意，${today}`));
   changed.push(f);
   await post(`/issues/${issue.number}/labels`, { labels: ["已同意"] });
-  await post(`/issues/${issue.number}/comments`, { body: `✅ 已記錄企劃同意：申請單 \`${c.id}\` 的任務 0.1 已打勾。對 AI 說「做 ${c.id}」就會開始實作。` });
+  await post(`/issues/${issue.number}/comments`, { body: `✅ 已記錄企劃同意：提案 \`${c.id}\` 的任務 0.1 已打勾。在管理台按「交給 AI 製作」，或在下面留言 \`@claude 開工\`，AI 就會開始做。` });
   console.log(`同意：${c.id}（Issue #${issue.number}）`);
 }
 if (changed.length) ({ changes } = readSpectra(root, specDir));
 
-// ---- 2、3. 申請單 Issue：沒有就開；已同意貼標籤；已結案就關 ----
+// ---- 2、3. 提案 Issue：沒有就開；已同意貼標籤；已完成就關 ----
 const issueOf = id => allIssues.find(i => (i.body || "").match(ISSUE_MARKER_RE)?.[1] === id);
 for (const c of changes) {
   let issue = issueOf(c.id);
   if (!c.archived && !issue) {
-    issue = await post("/issues", { title: `申請單：${c.title}（${c.id}）`, body: approvalIssueBody(c, repoUrl, specDir), labels: ["申請單"] });
+    issue = await post("/issues", { title: `提案：${c.title}（${c.id}）`, body: approvalIssueBody(c, repoUrl, specDir), labels: ["提案"] });
     allIssues.push(issue);
     console.log(`開 Issue #${issue.number}：${c.id}`);
   }
   if (!issue) continue;
   if (c.tasks.approved && !issue.labels?.some(l => (l.name || l) === "已同意")) await post(`/issues/${issue.number}/labels`, { labels: ["已同意"] });
   if (c.archived && issue.state === "open") {
-    await post(`/issues/${issue.number}/comments`, { body: `🎉 申請單 \`${c.id}\` 已結案（${c.date}），規則已併回規則書。` });
+    await post(`/issues/${issue.number}/comments`, { body: `🎉 提案 \`${c.id}\` 已完成（${c.date}），規則已併回規則書。` });
     await post(`/issues/${issue.number}`, { state: "closed", state_reason: "completed" }, "PATCH");
     issue.state = "closed";
-    console.log(`結案關閉 Issue #${issue.number}：${c.id}`);
+    console.log(`驗收關閉 Issue #${issue.number}：${c.id}`);
   }
   c.issue = { number: issue.number, url: issue.html_url, state: issue.state, comments: issue.comments };
 }
 
 // ---- 4. 工作台資料 ----
 const pick = label => allIssues.filter(i => i.labels?.some(l => (l.name || l) === label))
-  .map(i => ({ number: i.number, title: i.title, url: i.html_url, state: i.state, created: i.created_at, user: i.user?.login, labels: i.labels.map(l => l.name || l), comments: i.comments }));
+  .map(i => ({ number: i.number, title: i.title, url: i.html_url, state: i.state, created: i.created_at, user: i.user?.login, labels: i.labels.map(l => l.name || l), comments: i.comments, assignees: (i.assignees || []).map(a => a.login) }));
 const commits = execSync('git log -15 --date=iso-strict --pretty=format:%H%x1f%ad%x1f%an%x1f%s', { encoding: "utf8" })
   .split("\n").filter(Boolean).map(l => { const [sha, date, author, subject] = l.split("\x1f"); return { sha: sha.slice(0, 7), date, author, subject, url: `${repoUrl}/commit/${sha}` }; });
-const runs = (await gh("/actions/runs?per_page=20").catch(() => ({ workflow_runs: [] }))).workflow_runs
-  .filter(r => r.name !== "workbench").slice(0, 5)
+const allRuns = (await gh("/actions/runs?per_page=30").catch(() => ({ workflow_runs: [] }))).workflow_runs;
+// AI 工作（ai workflow）：管理台顯示「AI 正在做／做完了」；run 的標題就是被 @claude 的 Issue 標題
+const aiRuns = allRuns.filter(r => r.name === "ai").slice(0, 10)
+  .map(r => ({ status: r.status, conclusion: r.conclusion, date: r.created_at, url: r.html_url, title: r.display_title || "", event: r.event }));
+// 開著的 PR（AI 做完會開 PR，給程式審查）
+const pulls = (await gh("/pulls?state=open&per_page=30").catch(() => []))
+  .map(p => ({ number: p.number, title: p.title, url: p.html_url, user: p.user?.login, created: p.created_at, draft: p.draft, branch: p.head?.ref }));
+const runs = allRuns
+  .filter(r => r.name !== "workbench" && r.name !== "ai").slice(0, 5)
   .map(r => ({
     name: { "test-and-deploy": "自動測試＋部署", "pages build and deployment": "網站部署" }[r.name] || r.name,
     status: r.status, conclusion: r.conclusion, date: r.created_at, url: r.html_url,
@@ -116,9 +123,10 @@ const data = {
   tools: cfg.tools || [], // 專案工具（外掛）：框架以外、這個專案自己的工具
   changes, specs,
   requests: pick("需求"), feedback: pick("回饋"),
-  commits, runs,
+  commits, runs, aiRuns, pulls,
+  aiReady: process.env.AI_READY === "true", // repo 有設 AI 金鑰（ai workflow 才能跑）
 };
 mkdirSync("workbench-out", { recursive: true });
 writeFileSync("workbench-out/data.json", JSON.stringify(data, null, 1));
 writeFileSync("workbench-out/changed.txt", changed.join("\n"));
-console.log(`工作台資料：申請單 ${changes.length}、規則書 ${specs.length}、需求 ${data.requests.length}、回饋 ${data.feedback.length}`);
+console.log(`工作台資料：提案 ${changes.length}、規則書 ${specs.length}、需求 ${data.requests.length}、回饋 ${data.feedback.length}`);

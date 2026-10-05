@@ -1,6 +1,6 @@
 schema: spec-driven
 
-# 給 AI 寫申請單時看的專案背景。開新專案時把 <...> 換成你的遊戲。
+# 給 AI 寫提案時看的專案背景。開新專案時把 <...> 換成你的遊戲。
 context: |
   Game: <遊戲名稱> — <一句話玩法>.
   Tech: plain JavaScript (ES modules) + canvas in web/js; pure game rules live in web/js/rules.js so Node can test them.
@@ -22,5 +22,6 @@ rules:
     - 規則後面附一行中文說明（> 中文：…）
   tasks:
     - 第一組固定是「## 0. 企劃確認」，只有一項：「- [ ] 0.1 企劃確認：讀過 proposal 的為什麼、改什麼、需要企劃確認的事，同意開始實作」（企劃可在工作台／GitHub Issue、Notion、Spectra 桌面版同意，或在對話中說「同意」）。AI 不可以自己決定同意：只有企劃在對話中明確說「同意」或 Notion 卡片是「同意」時才由 AI 勾，並在後面註明「（企劃於對話中／Notion 同意，日期）」；GitHub Issue 的勾選由 workbench Action 自動寫回
+    - 需要人做的任務，開頭標上負責的角色：【企劃】【美術】【劇本】【數值】【程式】（例：「- [ ] 2.3 【美術】畫 Boss 第二階段立繪」）；AI 自己做的任務不用標。管理台會把這些任務放進該角色的「我的待辦」
     - 實作的第一個任務一定是「先寫會失敗的測試」（TDD）
     - 最後兩個任務固定是「跑全部測試」與「部署並通知」

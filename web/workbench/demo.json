@@ -30,11 +30,11 @@
    "title": "彈珠專案 → Notion 匯入（手動版，約 15 分鐘）"
   },
   {
-   "path": "docs/企劃/notion-import/申請單確認.csv",
-   "name": "申請單確認.csv",
+   "path": "docs/企劃/notion-import/提案確認.csv",
+   "name": "提案確認.csv",
    "ext": "csv",
    "size": 10714,
-   "title": "申請單確認"
+   "title": "提案確認"
   },
   {
    "path": "docs/企劃/notion-import/知識庫.csv",
@@ -491,6 +491,14 @@
        {
         "done": false,
         "text": "2.4 部署並通知"
+       },
+       {
+        "done": false,
+        "text": "2.9 【美術】畫 Boss 血條外框（粉紅噴漆風）"
+       },
+       {
+        "done": false,
+        "text": "2.10 【劇本】Boss 換招時的台詞 3 句"
        }
       ]
      }
@@ -502,7 +510,7 @@
     "approvalNote": "企劃於 GitHub Issue #10 同意，2026-10-06",
     "next": "2.3 跑全部測試"
    },
-   "status": "實作中",
+   "status": "製作中",
    "issue": {
     "number": 10,
     "url": "https://github.com/fishon100/pinball-sling/issues",
@@ -618,7 +626,7 @@
     "approvalNote": "",
     "next": ""
    },
-   "status": "已結案"
+   "status": "已完成"
   },
   {
    "id": "level-config-table",
@@ -738,7 +746,7 @@
     "approvalNote": "",
     "next": ""
    },
-   "status": "已結案"
+   "status": "已完成"
   },
   {
    "id": "layout-editor",
@@ -816,7 +824,7 @@
     "approvalNote": "",
     "next": ""
    },
-   "status": "已結案"
+   "status": "已完成"
   },
   {
    "id": "item-capsules",
@@ -824,7 +832,7 @@
    "archived": true,
    "date": "2026-10-05",
    "title": "道具改成掉落膠囊",
-   "why": "道具欄放在台面下方會擠壓台面（申請單 `fix-item-bar-covers-table` 修過一次），而且玩家要一邊接球一邊去按下面的按鈕，操作分心。企劃決定改成經典打磚塊的做法：道具藏在磚塊裡，打破後道具會掉下來，用滑板接到就馬上生效。這樣遊玩畫面上不需要道具欄，台面永遠是最大的。",
+   "why": "道具欄放在台面下方會擠壓台面（提案 `fix-item-bar-covers-table` 修過一次），而且玩家要一邊接球一邊去按下面的按鈕，操作分心。企劃決定改成經典打磚塊的做法：道具藏在磚塊裡，打破後道具會掉下來，用滑板接到就馬上生效。這樣遊玩畫面上不需要道具欄，台面永遠是最大的。",
    "what": "- 道具磚：第 2 關起每關 2～3 塊（第 1 關是教學關，不放），首領關也有\n- 打破道具磚，會掉下一顆「道具膠囊」（上面是道具圖示），直直往下掉\n- 用滑板（經典擋板模式：擋板）接到膠囊，就立刻用掉這個道具；沒接到就消失\n- 5 種道具的效果不變（漆彈、慢動作、球保險、加一顆、寬板）\n- **BREAKING** 拿掉道具欄與道具庫存：道具不再存起來帶到下一關；打完一區送 2 個道具的「街區獎勵」也拿掉；舊存檔裡的道具不再使用",
    "confirm": "",
    "breaking": true,
@@ -896,7 +904,7 @@
     "approvalNote": "",
     "next": ""
    },
-   "status": "已結案"
+   "status": "已完成"
   },
   {
    "id": "fix-plunger-moves-paddle",
@@ -954,7 +962,7 @@
     "approvalNote": "",
     "next": ""
    },
-   "status": "已結案"
+   "status": "已完成"
   },
   {
    "id": "fix-item-bar-covers-table",
@@ -1016,7 +1024,7 @@
     "approvalNote": "",
     "next": ""
    },
-   "status": "已結案"
+   "status": "已完成"
   },
   {
    "id": "fix-baseline-bugs",
@@ -1024,7 +1032,7 @@
    "archived": true,
    "date": "2026-10-05",
    "title": "修 4 個 bug（空白鍵、音效、從頭再打、跳過漫畫）",
-   "why": "盤點現有遊戲（申請單 `baseline-specs`）時發現 4 個 bug，企劃決定全部修正：\n\n1. 電腦上按住空白鍵拉發射桿，常常拉不滿、甚至發射不出去\n2. 音效、音樂開關重新整理後不會記住，每次都回到「開」\n3. 已經全破的街區，地圖上的「從頭再打一次」會從第 10 關（首領關）開始\n4. 第一次看漫畫時按「跳過」，也被記成「看過」，之後不會再自動播放",
+   "why": "盤點現有遊戲（提案 `baseline-specs`）時發現 4 個 bug，企劃決定全部修正：\n\n1. 電腦上按住空白鍵拉發射桿，常常拉不滿、甚至發射不出去\n2. 音效、音樂開關重新整理後不會記住，每次都回到「開」\n3. 已經全破的街區，地圖上的「從頭再打一次」會從第 10 關（首領關）開始\n4. 第一次看漫畫時按「跳過」，也被記成「看過」，之後不會再自動播放",
    "what": "1. 空白鍵的重送訊號不再重新拉桿；按住會一路拉滿\n2. 開關狀態寫進存檔（`save.sfx`、`save.music`），開遊戲時套用\n3. 全破的街區按「從頭再打一次」從該區第 1 關開始；其他情況維持原本公式\n4. 漫畫完整看完才記成「看過」；按跳過不記，下次還會自動播放",
    "confirm": "",
    "breaking": false,
@@ -1120,7 +1128,7 @@
     "approvalNote": "",
     "next": ""
    },
-   "status": "已結案"
+   "status": "已完成"
   },
   {
    "id": "baseline-specs",
@@ -1128,7 +1136,7 @@
    "archived": true,
    "date": "2026-10-05",
    "title": "把現有遊戲寫成 16 份規則書",
-   "why": "噴漆闖關目前的規則散在 Obsidian 的主架構規劃書與 F01～F15 功能規劃書，只有企劃這台電腦看得到，也沒有逐條對應到自動測試。團隊要改用 Spectra 的「申請單」流程，第一步必須先把「遊戲現在已經是這樣」寫成正式規則書，之後每張申請單才有比對的基準。",
+   "why": "噴漆闖關目前的規則散在 Obsidian 的主架構規劃書與 F01～F15 功能規劃書，只有企劃這台電腦看得到，也沒有逐條對應到自動測試。團隊要改用 Spectra 的「提案」流程，第一步必須先把「遊戲現在已經是這樣」寫成正式規則書，之後每張提案才有比對的基準。",
    "what": "- 把主架構規劃書與 F01～F15 的現有行為，寫成 16 份 Spectra 規則書（每份一個功能）\n- 每條規則都寫成「當……就要……」的情境，並標出目前由哪一個自動測試檢查\n- 找出還沒有測試的情境，補上測試或寫明為什麼不用測（例如純外觀）\n- 遊戲行為完全不改；只新增規則書與缺少的測試",
    "confirm": "",
    "breaking": false,
@@ -1206,7 +1214,7 @@
        },
        {
         "done": true,
-        "text": "4.2 把盤點發現的「文件與程式不一致」與疑似 bug（例如按住空白鍵發射桿一直歸零、音效開關重新整理後不記得、已通關街區的「從頭再打一次」從第 10 關開始、跳過漫畫也算看過）整理成清單交給企劃決定。驗收：企劃對每一項選「改程式／改規則／不處理」，選「改」的各開一張申請單"
+        "text": "4.2 把盤點發現的「文件與程式不一致」與疑似 bug（例如按住空白鍵發射桿一直歸零、音效開關重新整理後不記得、已通關街區的「從頭再打一次」從第 10 關開始、跳過漫畫也算看過）整理成清單交給企劃決定。驗收：企劃對每一項選「改程式／改規則／不處理」，選「改」的各開一張提案"
        }
       ]
      },
@@ -1227,7 +1235,7 @@
     "approvalNote": "",
     "next": ""
    },
-   "status": "已結案"
+   "status": "已完成"
   }
  ],
  "specs": [
@@ -2277,5 +2285,35 @@
    "icon": "flask",
    "desc": "自動測試、擬人玩家難度報告"
   }
- ]
+ ],
+ "aiRuns": [
+  {
+   "status": "in_progress",
+   "conclusion": null,
+   "date": "2026-10-05T18:16:49.797Z",
+   "url": "https://github.com/fishon100/game-dev-flow-template/actions",
+   "title": "提案：首領血條改成分段（boss-hp-bar）",
+   "event": "issue_comment"
+  },
+  {
+   "status": "completed",
+   "conclusion": "success",
+   "date": "2026-10-04T16:20:49.797Z",
+   "url": "https://github.com/fishon100/game-dev-flow-template/actions",
+   "title": "回饋：第 5 關球常卡在右上角",
+   "event": "issue_comment"
+  }
+ ],
+ "pulls": [
+  {
+   "number": 41,
+   "title": "Boss 血條：先寫測試＋血條元件",
+   "url": "https://github.com/fishon100/game-dev-flow-template/pulls",
+   "user": "claude[bot]",
+   "created": "2026-10-05T17:30:49.797Z",
+   "draft": false,
+   "branch": "claude/issue-12"
+  }
+ ],
+ "aiReady": false
 }

@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        寫「玩家遇到什麼、想要什麼感覺」就好，不用寫怎麼做。AI 會整理成申請單，等你同意後才開始做。
+        寫「玩家遇到什麼、想要什麼感覺」就好，不用寫怎麼做。AI 會整理成提案，等你同意後才開始做。
   - type: dropdown
     id: priority
     attributes:

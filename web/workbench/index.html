@@ -59,9 +59,9 @@ h2 small { font-weight: 400; color: var(--muted); font-size: 13px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .s-待同意 { background: var(--warn-soft); color: var(--warn); }
-.s-已同意, .s-實作中 { background: var(--info-soft); color: var(--info); }
-.s-待結案 { background: var(--brand-soft); color: var(--brand); }
-.s-已結案 { background: var(--ok-soft); color: var(--ok); }
+.s-已同意, .s-製作中 { background: var(--info-soft); color: var(--info); }
+.s-待驗收 { background: var(--brand-soft); color: var(--brand); }
+.s-已完成 { background: var(--ok-soft); color: var(--ok); }
 .lv-red { background: var(--bad-soft); color: var(--bad); } .lv-yellow { background: var(--warn-soft); color: var(--warn); } .lv-green { background: var(--ok-soft); color: var(--ok); }
 .title { font-weight: 700; font-size: 16px; margin: 6px 0 2px; }
 .muted { color: var(--muted); font-size: 14px; }
@@ -109,7 +109,7 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
   <div class="wrap" style="padding-bottom:0">
     <nav class="tabs" role="tablist" aria-label="工作台分頁">
       <button role="tab" data-tab="home" aria-selected="true">首頁</button>
-      <button role="tab" data-tab="changes">申請單</button>
+      <button role="tab" data-tab="changes">提案</button>
       <button role="tab" data-tab="issues">回饋與需求</button>
       <button role="tab" data-tab="specs">規則書</button>
       <button role="tab" data-tab="activity">上線紀錄</button>
@@ -137,7 +137,7 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
       <div class="stats" id="stats"></div>
     </section>
     <section>
-      <h2>進行中的申請單</h2>
+      <h2>進行中的提案</h2>
       <div class="grid" id="home-active"></div>
     </section>
     <section>
@@ -148,7 +148,7 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
 
   <div data-panel="changes" hidden>
     <section><h2>進行中 <small>依狀態排序</small></h2><div class="grid" id="ch-active"></div></section>
-    <section><h2>已結案 <small id="ch-archived-n"></small></h2><div class="card"><ul class="list" id="ch-archived"></ul></div></section>
+    <section><h2>已完成 <small id="ch-archived-n"></small></h2><div class="card"><ul class="list" id="ch-archived"></ul></div></section>
   </div>
 
   <div data-panel="issues" hidden>
@@ -159,7 +159,7 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
   </div>
 
   <div data-panel="specs" hidden>
-    <section><h2>規則書 <small>遊戲「現在」的規則；要改請開申請單</small></h2><div class="card"><ul class="list" id="specs"></ul></div></section>
+    <section><h2>規則書 <small>遊戲「現在」的規則；要改請開提案</small></h2><div class="card"><ul class="list" id="specs"></ul></div></section>
   </div>
 
   <div data-panel="activity" hidden>
@@ -170,15 +170,15 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
   <div data-panel="help" class="help" hidden>
     <section class="card">
       <h2>這個工作台是什麼</h2>
-      <p class="muted">專案的總覽：哪些申請單在等你同意、做到哪、有哪些回饋還沒處理、最近有沒有上線成功。手機、電腦、平板都能開，不用安裝任何東西。可以「加到主畫面」當 App 用。</p>
-      <h3>同意一張申請單（手機也可以）</h3>
+      <p class="muted">專案的總覽：哪些提案在等你同意、做到哪、有哪些回饋還沒處理、最近有沒有上線成功。手機、電腦、平板都能開，不用安裝任何東西。可以「加到主畫面」當 App 用。</p>
+      <h3>同意一張提案（手機也可以）</h3>
       <ol>
-        <li>首頁「需要你處理」→ 點申請單的 <b>看內容並同意</b></li>
+        <li>首頁「需要你處理」→ 點提案的 <b>看內容並同意</b></li>
         <li>會打開 GitHub：讀「為什麼、改什麼、需要企劃確認的事」</li>
         <li>沒問題就勾 <b>☐ 企劃同意</b>（GitHub App 或網頁都能勾）；有意見就在下面留言</li>
         <li>約 1 分鐘後，工作台會顯示「已同意」，AI 就能開始做</li>
       </ol>
-      <p class="muted">其他同意方式也算：Spectra 桌面版勾任務 0.1、Notion 卡片改「同意」後對 AI 說「看申請單」、或直接對 AI 說「同意 xxx」。</p>
+      <p class="muted">其他同意方式也算：Spectra 桌面版勾任務 0.1、Notion 卡片改「同意」後對 AI 說「看提案」、或直接對 AI 說「同意 xxx」。</p>
       <h3>寫回饋、提需求</h3>
       <ul>
         <li>按「寫回饋」或「提需求」，照表單填，截圖直接拖進去</li>
@@ -188,7 +188,7 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
       <h3>不在電腦前，怎麼叫 AI 做事</h3>
       <ul>
         <li><b>Claude 手機 App ＋ Remote Control</b>：電腦上的 Claude Code 開著，手機就能看到它在做什麼、直接下指令（電腦要開機、不能睡眠）</li>
-        <li><b>這個工作台＋GitHub App</b>：看進度、同意申請單、寫回饋——不需要電腦開著</li>
+        <li><b>這個工作台＋GitHub App</b>：看進度、同意提案、寫回饋——不需要電腦開著</li>
         <li>每次上線，手機會收到 ntfy 通知（專案有設定的話），點開就能試玩</li>
       </ul>
       <h3>換一台電腦</h3>
@@ -198,11 +198,11 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
       </ul>
       <h3>狀態是什麼意思</h3>
       <ul>
-        <li><span class="chip s-待同意">待同意</span> AI 寫好申請單，等企劃看過同意</li>
+        <li><span class="chip s-待同意">待同意</span> AI 寫好提案，等企劃看過同意</li>
         <li><span class="chip s-已同意">已同意</span> 可以開始做了（對 AI 說「做 xxx」）</li>
-        <li><span class="chip s-實作中">實作中</span> AI 正在照任務清單做，進度條是完成的任務數</li>
-        <li><span class="chip s-待結案">待結案</span> 任務都做完、已上線：請試玩，沒問題就說「xxx 結案」</li>
-        <li><span class="chip s-已結案">已結案</span> 規則已併回規則書</li>
+        <li><span class="chip s-製作中">製作中</span> AI 正在照任務清單做，進度條是完成的任務數</li>
+        <li><span class="chip s-待驗收">待驗收</span> 任務都做完、已上線：請試玩，沒問題就說「xxx 驗收通過」</li>
+        <li><span class="chip s-已完成">已完成</span> 規則已併回規則書</li>
       </ul>
     </section>
   </div>
@@ -230,7 +230,7 @@ import { icon as I } from "../console/icons.js?v=202610061400";
     return `${Math.round(h / 24)} 天前`;
   };
   const day = iso => new Date(iso).toLocaleDateString("zh-TW", { month: "numeric", day: "numeric" });
-  const ORDER = { 待同意: 0, 待結案: 1, 實作中: 2, 已同意: 3, 已結案: 9 };
+  const ORDER = { 待同意: 0, 待驗收: 1, 製作中: 2, 已同意: 3, 已完成: 9 };
   const short = (s, n) => { s = String(s || "").replace(/[#*`>_]/g, "").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
   const newIssue = t => `${repoUrl}/issues/new?template=${t}.yml`;
 
@@ -255,8 +255,8 @@ import { icon as I } from "../console/icons.js?v=202610061400";
       ${c.status === "待同意" && c.confirm ? `<div class="ask">${esc(short(c.confirm, 220))}</div>` : ""}
       ${c.tasks.total ? `<div class="bar" aria-label="進度 ${pct}%"><i style="width:${pct}%"></i></div><div class="muted">任務 ${c.tasks.done}/${c.tasks.total}${c.tasks.next ? `・下一步：${esc(short(c.tasks.next, 40))}` : ""}</div>` : ""}
       ${c.tasks.approvalNote ? `<div class="muted">${I("checkCircle", 14)} ${esc(c.tasks.approvalNote)}</div>` : ""}
-      ${c.status === "待結案" ? `<div class="ask">已經做完：請試玩，沒問題就對 AI 說「${esc(c.id)} 結案」</div>` : ""}
-      <div class="row" style="margin-top:10px">${approve}<a class="btn" href="${files}" target="_blank" rel="noopener">${I("fileText", 16)}完整申請單</a>${c.issue && c.status !== "待同意" ? `<a class="btn" href="${esc(c.issue.url)}" target="_blank" rel="noopener">${I("message", 16)}討論 ${c.issue.comments ? `(${c.issue.comments})` : ""}</a>` : ""}</div>
+      ${c.status === "待驗收" ? `<div class="ask">已經做完：請試玩，沒問題就對 AI 說「${esc(c.id)} 驗收通過」</div>` : ""}
+      <div class="row" style="margin-top:10px">${approve}<a class="btn" href="${files}" target="_blank" rel="noopener">${I("fileText", 16)}完整提案</a>${c.issue && c.status !== "待同意" ? `<a class="btn" href="${esc(c.issue.url)}" target="_blank" rel="noopener">${I("message", 16)}討論 ${c.issue.comments ? `(${c.issue.comments})` : ""}</a>` : ""}</div>
     </article>`;
   }
   const lvClass = t => (/🔴|必修/.test(t) ? "lv-red" : /🟢|很好/.test(t) ? "lv-green" : "lv-yellow");
@@ -265,7 +265,9 @@ import { icon as I } from "../console/icons.js?v=202610061400";
       <div class="muted">#${i.number}・${esc(i.user || "")}・${day(i.created)}${i.comments ? `・${i.comments} 則留言` : ""}</div></div></li>`;
   }
 
+  const OLD_STATUS = { 實作中: "製作中", 待結案: "待驗收", 已結案: "已完成" }; // 專案還沒更新同步程式時的舊狀態名稱
   function render(d, fromCache) {
+    for (const c of d.changes || []) c.status = OLD_STATUS[c.status] || c.status;
     window.__data = d;
     repoUrl = d.repoUrl || repoUrl;
     document.title = `${d.name}｜開發工作台`;
@@ -274,7 +276,7 @@ import { icon as I } from "../console/icons.js?v=202610061400";
     const active = d.changes.filter(c => !c.archived).sort((a, b) => ORDER[a.status] - ORDER[b.status]);
     const archived = d.changes.filter(c => c.archived);
     const waiting = active.filter(c => c.status === "待同意");
-    const toClose = active.filter(c => c.status === "待結案");
+    const toClose = active.filter(c => c.status === "待驗收");
     const fbOpen = d.feedback.filter(i => i.state === "open");
     const rqOpen = d.requests.filter(i => i.state === "open");
     const lastRun = d.runs[0];
@@ -282,7 +284,7 @@ import { icon as I } from "../console/icons.js?v=202610061400";
     // 首頁：需要你處理
     const todo = [];
     waiting.forEach(c => todo.push(`<div class="row"><span class="grow" style="flex:1"><b>${esc(c.title)}</b> 等你同意</span>${c.issue ? `<a class="btn" style="background:#fff;color:#0e4b59;min-height:40px" href="${esc(c.issue.url)}" target="_blank" rel="noopener">看內容並同意</a>` : ""}</div>`));
-    toClose.forEach(c => todo.push(`<div><b>${esc(c.title)}</b> 做完了：試玩後說「${esc(c.id)} 結案」</div>`));
+    toClose.forEach(c => todo.push(`<div><b>${esc(c.title)}</b> 做完了：試玩後說「${esc(c.id)} 驗收通過」</div>`));
     if (fbOpen.length) todo.push(`<div>有 <b>${fbOpen.length}</b> 則回饋還沒處理：對 AI 說「看回饋」</div>`);
     if (lastRun && lastRun.conclusion === "failure") todo.push(`<div>最近一次「${esc(lastRun.name)}」失敗了：<a href="${esc(lastRun.url)}" target="_blank" rel="noopener">看原因</a>，或對 AI 說「部署失敗了，幫我看」</div>`);
     $("#todo").innerHTML = `<div class="row"><span class="num">${waiting.length + toClose.length}</span><span>件事需要你處理</span></div>` +
@@ -301,14 +303,14 @@ import { icon as I } from "../console/icons.js?v=202610061400";
     $("#quick2").innerHTML = `<a class="btn primary" href="${newIssue("feedback")}" target="_blank" rel="noopener">${I("gamepad", 16)}寫回饋</a><a class="btn" href="${newIssue("request")}" target="_blank" rel="noopener">${I("lightbulb", 16)}提需求</a>`;
 
     $("#stats").innerHTML = [
-      [active.length, "進行中申請單"], [archived.length, "已結案"], [d.specs.length, "份規則書"],
+      [active.length, "進行中提案"], [archived.length, "已完成"], [d.specs.length, "份規則書"],
       [lastRun ? I(lastRun.conclusion === "success" ? "checkCircle" : lastRun.conclusion === "failure" ? "alert" : "hourglass", 24) : "—", "最近上線"],
     ].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join("");
 
-    $("#home-active").innerHTML = active.length ? active.map(c => changeCard(c, { compact: true })).join("") : `<div class="card empty">沒有進行中的申請單。新想法寫在「提需求」，再對 AI 說「看需求」。</div>`;
-    $("#ch-active").innerHTML = active.length ? active.map(c => changeCard(c)).join("") : `<div class="card empty">沒有進行中的申請單。</div>`;
+    $("#home-active").innerHTML = active.length ? active.map(c => changeCard(c, { compact: true })).join("") : `<div class="card empty">沒有進行中的提案。新想法寫在「提需求」，再對 AI 說「看需求」。</div>`;
+    $("#ch-active").innerHTML = active.length ? active.map(c => changeCard(c)).join("") : `<div class="card empty">沒有進行中的提案。</div>`;
     $("#ch-archived-n").textContent = `${archived.length} 張`;
-    $("#ch-archived").innerHTML = archived.map(c => `<li><span class="chip s-已結案">${esc(c.date.slice(5).replace("-", "/"))}</span><div class="grow"><a class="t" href="${repoUrl}/tree/main/${d.specDir}/changes/archive/${encodeURIComponent(c.folder)}" target="_blank" rel="noopener">${esc(c.title)}</a><div class="muted">${esc(c.id)}・任務 ${c.tasks.done}/${c.tasks.total}</div></div></li>`).join("") || `<li class="empty">還沒有</li>`;
+    $("#ch-archived").innerHTML = archived.map(c => `<li><span class="chip s-已完成">${esc(c.date.slice(5).replace("-", "/"))}</span><div class="grow"><a class="t" href="${repoUrl}/tree/main/${d.specDir}/changes/archive/${encodeURIComponent(c.folder)}" target="_blank" rel="noopener">${esc(c.title)}</a><div class="muted">${esc(c.id)}・任務 ${c.tasks.done}/${c.tasks.total}</div></div></li>`).join("") || `<li class="empty">還沒有</li>`;
 
     $("#fb-open").innerHTML = fbOpen.map(i => issueItem(i).replace('<div class="grow">', `<span class="chip ${lvClass(i.title + i.labels.join())}">${/🔴|必修/.test(i.title) ? "必修" : /🟢|很好/.test(i.title) ? "很好" : "回饋"}</span><div class="grow">`)).join("") || `<li class="empty">沒有未處理的回饋 👍</li>`;
     $("#rq-open").innerHTML = rqOpen.map(issueItem).join("") || `<li class="empty">沒有未處理的需求</li>`;

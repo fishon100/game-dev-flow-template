@@ -42,7 +42,7 @@ export async function verify(repo) {
 
 /** 預先填好權限的「產生登入碼」連結（fine-grained token） */
 export function tokenUrl(owner) {
-  const q = new URLSearchParams({ name: "開發管理台", description: "開發管理台：同意申請單、留言、寫回饋、編輯企劃內容", target_name: owner, expires_in: "90", contents: "write", issues: "write", metadata: "read" });
+  const q = new URLSearchParams({ name: "開發管理台", description: "開發管理台：同意提案、留言、寫回饋、編輯企劃內容", target_name: owner, expires_in: "90", contents: "write", issues: "write", metadata: "read" });
   return `https://github.com/settings/personal-access-tokens/new?${q}`;
 }
 export const classicTokenUrl = "https://github.com/settings/tokens/new?scopes=repo&description=%E9%96%8B%E7%99%BC%E7%AE%A1%E7%90%86%E5%8F%B0";
@@ -80,7 +80,7 @@ export async function uploadFile(repo, path, file, message, branch = "main") {
 
 const APPROVE_RE = /^- \[( |x|X)\] 企劃同意/m;
 const TASK_RE = /^- \[( |x|X)\] 0\.1 .*$/m;
-/** 同意申請單：有 Issue 就在 Issue 上打勾（Actions 會寫回 tasks.md）；沒有 Issue 就直接改 tasks.md */
+/** 同意提案：有 Issue 就在 Issue 上打勾（Actions 會寫回 tasks.md）；沒有 Issue 就直接改 tasks.md */
 export async function approveChange(repo, change, specDir, branch) {
   const who = auth.user?.login || "管理台";
   if (change.issue?.number) {
@@ -88,7 +88,7 @@ export async function approveChange(repo, change, specDir, branch) {
     if (!APPROVE_RE.test(issue.body || "")) throw new Error("這個 Issue 裡找不到「企劃同意」勾選框");
     if (/^- \[[xX]\] 企劃同意/m.test(issue.body)) return "already"; // 已經同意過（例如重新整理後又按一次）：不重複留言
     await gh(`/repos/${repo}/issues/${change.issue.number}`, { method: "PATCH", body: { body: issue.body.replace(APPROVE_RE, "- [x] 企劃同意") } });
-    await gh(`/repos/${repo}/issues/${change.issue.number}/comments`, { method: "POST", body: { body: `👍 ${who} 在管理台同意了這張申請單。` } });
+    await gh(`/repos/${repo}/issues/${change.issue.number}/comments`, { method: "POST", body: { body: `👍 ${who} 在管理台同意了這張提案。` } });
     return "issue";
   }
   const path = `${specDir}/changes/${change.folder}/tasks.md`;

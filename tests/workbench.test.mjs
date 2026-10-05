@@ -1,4 +1,4 @@
-// 工作台：申請單解析、同意勾選、狀態判斷。執行：node --test
+// 工作台：提案解析、同意勾選、狀態判斷。執行：node --test
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
@@ -33,13 +33,13 @@ test("同意：只勾 0.1、加註來源；已勾過不重複加註", () => {
   assert.equal(parseTasks(once).approvalNote, "企劃於 GitHub Issue #3 同意，2026-10-06");
 });
 
-test("狀態：待同意 → 已同意 → 實作中 → 待結案 → 已結案", () => {
+test("狀態：待同意 → 已同意 → 製作中 → 待驗收 → 已完成", () => {
   const t = (done, total, approved) => ({ hasApprovalItem: true, approved, done, total });
   assert.equal(statusOf({ archived: false, tasks: t(0, 3, false) }), "待同意");
   assert.equal(statusOf({ archived: false, tasks: t(0, 3, true) }), "已同意");
-  assert.equal(statusOf({ archived: false, tasks: t(1, 3, true) }), "實作中");
-  assert.equal(statusOf({ archived: false, tasks: t(3, 3, true) }), "待結案");
-  assert.equal(statusOf({ archived: true, tasks: t(3, 3, true) }), "已結案");
+  assert.equal(statusOf({ archived: false, tasks: t(1, 3, true) }), "製作中");
+  assert.equal(statusOf({ archived: false, tasks: t(3, 3, true) }), "待驗收");
+  assert.equal(statusOf({ archived: true, tasks: t(3, 3, true) }), "已完成");
 });
 
 test("提案：讀中文標題、為什麼、需要企劃確認的事、BREAKING", () => {
@@ -50,7 +50,7 @@ test("提案：讀中文標題、為什麼、需要企劃確認的事、BREAKING
   assert.equal(p.breaking, true);
 });
 
-test("讀資料夾：進行中、已結案（日期與代號分開）、規則書條數", () => {
+test("讀資料夾：進行中、已完成（日期與代號分開）、規則書條數", () => {
   const root = mkdtempSync(join(tmpdir(), "wb-"));
   const S = join(root, "docs/spectra");
   mkdirSync(join(S, "changes/paddle-wide"), { recursive: true });
@@ -61,7 +61,7 @@ test("讀資料夾：進行中、已結案（日期與代號分開）、規則�
   mkdirSync(join(S, "specs/catch-ball"), { recursive: true });
   writeFileSync(join(S, "specs/catch-ball/spec.md"), "## Purpose\n\nx\n\n> 中文：接球遊戲\n\n## Requirements\n\n### Requirement: A\n\n#### Scenario: a\n\n#### Scenario: b\n");
   const { changes, specs } = readSpectra(root);
-  assert.deepEqual(changes.map(c => [c.id, c.status, c.date]), [["paddle-wide", "待同意", ""], ["old-one", "已結案", "2026-10-05"]]);
+  assert.deepEqual(changes.map(c => [c.id, c.status, c.date]), [["paddle-wide", "待同意", ""], ["old-one", "已完成", "2026-10-05"]]);
   assert.deepEqual(specs.map(s => [s.name, s.purpose, s.requirements, s.scenarios]), [["catch-ball", "接球遊戲", 1, 2]]);
   assert.deepEqual(specs[0].reqs, [{ name: "A", zh: "", scenarios: ["a", "b"] }]);
   assert.deepEqual(changes[0].artifacts, { proposal: true, specs: false, design: false, tasks: true });

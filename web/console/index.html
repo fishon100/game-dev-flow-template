@@ -132,9 +132,9 @@ h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 10px; color: var(--sub); d
 button.chip { cursor: pointer; } button.chip:hover { filter: brightness(.97); }
 .s-待同意 { background: var(--warn-soft); color: var(--warn); }
 .s-已同意 { background: var(--info-soft); color: var(--info); }
-.s-實作中 { background: var(--accent-soft); color: var(--accent); }
-.s-待結案 { background: var(--violet-soft); color: var(--violet); }
-.s-已結案 { background: var(--ok-soft); color: var(--ok); }
+.s-製作中 { background: var(--accent-soft); color: var(--accent); }
+.s-待驗收 { background: var(--violet-soft); color: var(--violet); }
+.s-已完成 { background: var(--ok-soft); color: var(--ok); }
 .c-bad { background: var(--bad-soft); color: var(--bad); } .c-ok { background: var(--ok-soft); color: var(--ok); } .c-warn { background: var(--warn-soft); color: var(--warn); }
 .bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; min-width: 70px; }
 .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
@@ -288,6 +288,26 @@ li.closed > ul { display: none; }
 .err { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
 .banner { display: flex; gap: 8px; align-items: flex-start; background: var(--accent-soft); color: var(--ink); border-radius: 8px; padding: 9px 12px; margin-bottom: 12px; font-size: 12.5px; }
 .banner .ico { color: var(--accent); margin-top: 2px; }
+.banner.warn { background: var(--warn-soft); }
+.banner.warn .ico { color: var(--warn); }
+/* 角色選擇與「我的待辦」 */
+.roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.role { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.role:hover { border-color: var(--accent); background: var(--accent-soft); }
+.role .ico { color: var(--accent); }
+.role b { font-weight: 600; }
+.role small { color: var(--faint); font-size: 12px; line-height: 1.45; }
+.role-pick .ph .muted { font-size: 12px; }
+.rsel { font: inherit; font-size: 12.5px; padding: 3px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); color: var(--ink); }
+@media (max-width: 820px) { .role-pick .ph .muted { display: none; } }
+/* 名詞小抄 */
+.gloss { margin: 0; display: grid; gap: 10px; }
+.gloss dt { font-weight: 600; }
+.gloss dd { margin: 2px 0 0; color: var(--sub); font-size: 13px; line-height: 1.55; }
+/* 對話框裡收起來的進階設定 */
+details.adv { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 10px 12px; margin: 10px 0; }
+details.adv summary { cursor: pointer; font-weight: 600; }
+details.adv[open] summary { margin-bottom: 8px; }
 .close { float: right; }
 .scrim { display: none; }
 [hidden] { display: none !important; }
@@ -356,6 +376,6 @@ dialog::backdrop { background: rgb(10 10 20 / .45); }
 </div>
 <dialog id="dlg"></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=202610061600"></script>
+<script type="module" src="app.js?v=202610061910"></script>
 </body>
 </html>
