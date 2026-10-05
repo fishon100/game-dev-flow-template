@@ -1,8 +1,8 @@
 // 開發管理台：多專案、流程圖（泳道）、申請單、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js?v=202610061400";
-import { icon as I, hasIcon } from "./icons.js?v=202610061400";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js?v=202610061600";
+import { icon as I, hasIcon } from "./icons.js?v=202610061600";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -123,22 +123,31 @@ V.overview = () => {
     ...(fbOpen.length ? [`<li><span class="status-dot bad"></span><div class="g"><div class="t1">${fbOpen.length} 則回饋還沒處理</div><div class="muted">對 AI 說「看回饋」</div></div><button class="btn sm" data-go="issues">查看</button></li>`] : []),
     ...(d.runs[0]?.conclusion === "failure" ? [`<li><span class="status-dot bad"></span><div class="g"><div class="t1">最近一次「${esc(d.runs[0].name)}」失敗</div></div><a class="btn sm" href="${esc(d.runs[0].url)}" target="_blank" rel="noopener">看原因</a></li>`] : []),
   ];
-  const kpi = (ic, label, n, go) => `<div class="kpi" ${go ? `data-go="${go}"` : ""}><span class="k">${I(ic, 14)}${label}</span><b>${n}</b></div>`;
   const tools = toolsOf(d);
+  // 摘要列：一列看完各階段數量；要處理的數字用狀態色
+  const seg = (ic, label, n, go, cls = "") => `<button class="seg-i ${n ? cls : ""}" data-go="${go}"><span class="k">${I(ic, 13)}${label}</span><b>${n}</b></button>`;
+  const active = [...act].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
+  const linkRow = (ic, label, n, go) => `<li data-go="${go}" style="cursor:pointer">${I(ic, 15)}<div class="g">${label}</div><span class="muted" style="font-variant-numeric:tabular-nums">${n}</span>${I("chevronRight", 14)}</li>`;
   return `<div class="crumb">${esc(d.repo)}</div>
     ${vh("home", esc(d.name), "", `${playLinks(d).map(l => `<a class="btn primary" href="${esc(l.url)}" target="_blank" rel="noopener">${I("play", 14)}試玩</a>`).join("")}${issueBtns()}`)}
-    <div class="kpis">
-      ${kpi("hourglass", "待同意", by("待同意").length, "flow")}${kpi("code", "實作中", by("已同意").length + by("實作中").length, "flow")}${kpi("flask", "待結案", by("待結案").length, "flow")}${kpi("archive", "已結案", arc.length, "changes")}
-      ${kpi("scroll", `規則書（${d.specs.reduce((n, s) => n + s.requirements, 0)} 條）`, d.specs.length, "specs")}${kpi("message", "未處理回饋／需求", fbOpen.length + rqOpen.length, "issues")}
+    <div class="strip">
+      ${seg("hourglass", "待同意", by("待同意").length, "flow", "attn")}${seg("code", "實作中", by("已同意").length + by("實作中").length, "flow")}${seg("flask", "待結案", by("待結案").length, "flow", "attn")}${seg("archive", "已結案", arc.length, "changes")}${seg("scroll", "規則", d.specs.reduce((n, s) => n + s.requirements, 0), "specs")}${seg("message", "未處理回饋", fbOpen.length + rqOpen.length, "issues", "bad")}
     </div>
-    <div class="grid2">
-      <div class="card"><h3>${I("alert", 14)}需要處理</h3>${todo.length ? `<ul class="list">${todo.join("")}</ul>` : `<div class="empty">目前沒有等待處理的事</div>`}</div>
-      <div class="card"><h3>${I("workflow", 14)}進行中的申請單</h3>${act.length ? `<ul class="list">${[...act].sort((a, b) => ORDER[a.status] - ORDER[b.status]).map(c => `<li data-change="${esc(c.id)}" style="cursor:pointer">${chip(c.status)}<div class="g"><div class="t1">${esc(c.title)}</div><div class="muted">${c.tasks.done}/${c.tasks.total}${c.tasks.next ? `・下一步：${esc(short(c.tasks.next, 36))}` : ""}</div></div>${barHtml(c)}</li>`).join("")}</ul>` : `<div class="empty">沒有進行中的申請單</div>`}</div>
-      <div class="card"><h3>${I("rocket", 14)}最近上線</h3><ul class="list">${d.runs.slice(0, 5).map(runLi).join("") || `<li class="empty">還沒有紀錄</li>`}</ul></div>
-      <div class="card"><h3>${I("files", 14)}內容</h3><div class="kpis" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">
-        ${kpi("fileText", "企劃文件", content.filter(f => f.ext === "md").length, "files")}${kpi("image", "圖片素材", content.filter(f => IMG.test(f.ext)).length, "assets")}${kpi("puzzle", "專案工具", tools.length, "tools")}</div></div>
+    <div class="ov-grid">
+      <div class="col">
+        ${panel("alert", "需要處理", todo.length ? `<ul class="list">${todo.join("")}</ul>` : `<div class="empty">目前沒有等待處理的事</div>`, todo.length ? `<span class="chip c-warn">${todo.length}</span>` : "")}
+        ${panel("workflow", "進行中的申請單", active.length ? `<table class="t stack"><thead><tr><th>狀態</th><th>申請單</th><th>進度</th></tr></thead><tbody>${active.map(c => `<tr class="click" data-change="${esc(c.id)}"><td>${chip(c.status)}</td><td style="min-width:0"><div style="font-weight:600">${esc(c.title)}</div><div class="muted">${c.tasks.next ? `下一步：${esc(short(c.tasks.next, 40))}` : esc(c.id)}</div></td><td style="width:150px">${barHtml(c)}<div class="muted" style="margin-top:4px">${c.tasks.done}/${c.tasks.total} 任務</div></td></tr>`).join("")}</tbody></table>` : `<div class="empty">沒有進行中的申請單</div>`, `<button class="btn sm" data-go="flow">${I("workflow", 13)}流程圖</button>`, true)}
+      </div>
+      <div class="col">
+        ${panel("rocket", "最近上線", `<ul class="list">${d.runs.slice(0, 5).map(runLi).join("") || `<li class="empty">還沒有紀錄</li>`}</ul>`, `<button class="btn sm" data-go="activity">全部</button>`)}
+        ${panel("files", "內容與工具", `<ul class="list">${linkRow("fileText", "企劃文件", content.filter(f => f.ext === "md").length, "files")}${linkRow("image", "圖片素材", content.filter(f => IMG.test(f.ext)).length, "assets")}${linkRow("puzzle", "專案工具", tools.length, "tools")}</ul>`)}
+      </div>
     </div>`;
 };
+// 面板：標題列＋內容（flush＝內容是表格，不要內距）
+function panel(ic, title, body, right = "", flush = false) {
+  return `<section class="panel"><div class="ph">${I(ic, 15)}<h3>${title}</h3><span class="spacer"></span>${right}</div><div class="pb ${flush ? "flush" : ""}">${body}</div></section>`;
+}
 
 // ===== 流程圖：上方是標準流程，下方每張進行中的申請單一條泳道，標出它走到哪 =====
 const STAGES = [
@@ -274,7 +283,7 @@ V.tree = () => { S.flowMode = "tree"; S.view = "flow"; return V.flow(); };
 V.changes = () => {
   const d = S.data, list = [...d.changes].sort((a, b) => (ORDER[a.status] - ORDER[b.status]) || b.folder.localeCompare(a.folder));
   return vh("list", "申請單", "點一列看明細與進度鏈") +
-    `<div class="tablewrap"><table class="t"><thead><tr><th>狀態</th><th>申請單</th><th>進度</th><th>同意</th><th>日期</th></tr></thead><tbody>
+    `<div class="tablewrap"><table class="t stack"><thead><tr><th>狀態</th><th>申請單</th><th>進度</th><th>同意</th><th>日期</th></tr></thead><tbody>
     ${list.map(c => `<tr class="click ${S.sel === c.id ? "sel" : ""}" data-change="${esc(c.id)}"><td>${chip(c.status)}</td><td><div style="font-weight:600">${esc(c.title)}</div><div class="muted" style="font-family:var(--mono)">${esc(c.id)}</div></td><td style="min-width:130px">${barHtml(c)}<div class="muted">${c.tasks.done}/${c.tasks.total}</div></td><td>${c.archived || c.tasks.approved ? `<span class="ck">${I("checkCircle", 16)}</span>` : `<span class="ck-no">${I("circle", 16)}</span>`}</td><td class="muted">${esc(c.date || "進行中")}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">還沒有申請單</td></tr>`}
     </tbody></table></div>`;
 };
@@ -400,7 +409,10 @@ async function openDoc(path, target) {
     else { const r = await fetch(raw(path) + `?t=${Date.now()}`); if (!r.ok) throw new Error(r.status); text = await r.text(); }
     if (req !== S.docReq) return;
     const editable = canWrite() && path.endsWith(".md");
-    const head = `<div class="dochead"><span class="path" title="${esc(path)}">${esc(path)}</span>${editable ? `<button class="btn sm" data-edit="${esc(path)}">${I("edit", 14)}編輯</button>` : ""}<a class="btn sm" href="${blob(path)}" target="_blank" rel="noopener">${I("external", 14)}GitHub</a></div>`;
+    // 同步工具在檔頭加的說明行：不當內文顯示，改成檔頭的小標籤
+    const synced = /^> 🔁 [^\n]*\n\n?/m.test(text);
+    if (synced) text = text.replace(/^> 🔁 [^\n]*\n\n?/m, "");
+    const head = `<div class="dochead"><span class="path" title="${esc(path)}">${esc(path)}</span>${synced ? `<span class="chip" title="正本在 Obsidian，和這裡雙向同步">${I("refresh", 12)}與 Obsidian 同步</span>` : ""}${editable ? `<button class="btn sm" data-edit="${esc(path)}">${I("edit", 14)}編輯</button>` : ""}<a class="btn sm" href="${blob(path)}" target="_blank" rel="noopener">${I("external", 14)}GitHub</a></div>`;
     if (path.endsWith(".csv")) {
       const rows = parseCsv(text);
       el.innerHTML = head + `<div class="tablewrap"><table class="t"><thead><tr>${(rows[0] || []).map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.slice(1).filter(r => r.some(Boolean)).map(r => `<tr>${r.map(c => `<td class="pre">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
@@ -739,7 +751,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610061400"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610061600"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}

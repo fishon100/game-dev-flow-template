@@ -15,7 +15,7 @@ function png(size, rgba) {
 
 // 64×64 的設計座標（同 icon.svg）
 const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
-const A = hex("#4338CA"), B = hex("#7C3AED"), WHITE = [255, 255, 255], CYAN = hex("#22D3EE");
+const A = hex("#0E4B59"), B = hex("#0B6E83"), WHITE = [255, 255, 255], CYAN = hex("#7FE0EE");
 const inRoundRect = (x, y, r = 15) => { const cx = Math.min(Math.max(x, r), 64 - r), cy = Math.min(Math.max(y, r), 64 - r); return x >= 0 && x <= 64 && y >= 0 && y <= 64 && (x - cx) ** 2 + (y - cy) ** 2 <= r * r; };
 const distSeg = (x, y, x1, y1, x2, y2) => { const dx = x2 - x1, dy = y2 - y1, t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy))); return Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy)); };
 // 分支曲線 M21 24 c0 8 7 10 16 10 → 取樣成折線
