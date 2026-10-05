@@ -1,5 +1,5 @@
 # 工作台：同意勾選 → tasks.md、自動開／關申請單 Issue、更新工作台資料（workbench-data 分支）
-# 觸發：推上 main、Issue 有變動（開、改、標籤、關）、手動、每小時一次（保險）
+# 觸發：推上 main、Issue 有變動（開、改、標籤、關、留言）、部署跑完、手動、每小時一次（保險）
 name: workbench
 
 on:
@@ -9,6 +9,9 @@ on:
     types: [opened, edited, labeled, closed, reopened]
   issue_comment:
     types: [created]
+  workflow_run:
+    workflows: ["test-and-deploy"]
+    types: [completed]
   workflow_dispatch:
   schedule:
     - cron: "17 * * * *"
