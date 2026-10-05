@@ -9,7 +9,13 @@ context: |
   Difficulty MUST be measured with human-like bots (reaction time + timing/aim error), never machine reaction speed.
   Readers are game planners who are new to programming: write proposal, design and tasks in plain Traditional Chinese,
   avoid jargon, and explain every rule with a concrete in-game example.
-  Hard rules from the planner (never break): <列出主架構規劃書的核心規則>
+  # ↓ 以下抄自主架構規劃書；規劃書改了這裡要跟著改（對 AI 說「把主架構規劃書的核心規則抄進 config」）
+  One-liner (一句話): <主架構規劃書的一句話>
+  Design pillars (設計支柱，every proposal must serve at least one):
+    <支柱>｜<意思>
+  Core loop: <核心循環>
+  Hard rules from the planner (核心規則，不能改):
+    1. <核心規則>
 
 rules:
   proposal:
@@ -17,6 +23,7 @@ rules:
     - 「Why」用企劃看得懂的話寫：玩家遇到什麼問題、這次要解決什麼
     - 最後一節固定是「## 需要企劃確認的事」：數值、文字、取捨條列出來（沒有就寫「無」）
     - 有拿掉或改變玩家已經習慣的東西時，標 **BREAKING** 並說明影響
+    - 「Why」寫出這張提案服務哪一個設計支柱；會碰到核心規則的，在「需要企劃確認的事」第一條寫「⚠️ 會改到核心規則第 N 條：…」，企劃沒同意前不能做
   specs:
     - 每條規則下面至少一個「情境：當…，則…」，之後會一對一變成自動測試
     - 規則後面附一行中文說明（> 中文：…）
