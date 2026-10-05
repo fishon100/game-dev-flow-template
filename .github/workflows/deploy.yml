@@ -57,6 +57,7 @@ jobs:
         run: |
           if [ -z "$NTFY_TOPIC" ]; then echo "沒有設定 NTFY_TOPIC，略過通知"; exit 0; fi
           FIRST_LINE=$(printf '%s' "$MSG" | head -n 1)
+          FIRST_LINE=${FIRST_LINE:-手動重新部署}
           if [ "$OK" = "true" ]; then
             curl -s -H "Title: 遊戲已更新" -H "Tags: video_game" -H "Click: $SITE" \
               -H "Actions: view, 開啟遊戲, $SITE; view, 測試頁, ${SITE}test.html" \
