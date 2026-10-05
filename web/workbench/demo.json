@@ -348,12 +348,8 @@
  "name": "噴漆闖關 SPRAY RUN（示範資料）",
  "links": [
   {
-   "label": "▶ 試玩",
+   "label": "試玩",
    "url": "https://fishon100.github.io/pinball-sling/street/"
-  },
-  {
-   "label": "🧱 關卡編輯器",
-   "url": "https://fishon100.github.io/pinball-sling/street/editor.html"
   }
  ],
  "changes": [
@@ -2266,6 +2262,20 @@
    "date": "2026-10-05T16:51:50.863Z",
    "url": "https://github.com/fishon100/pinball-sling/actions",
    "title": "v3.7.3 關卡編輯器加台面模式"
+  }
+ ],
+ "tools": [
+  {
+   "label": "關卡編輯器",
+   "url": "https://fishon100.github.io/pinball-sling/street/editor.html",
+   "icon": "wrench",
+   "desc": "畫磚塊圖案與台面（中柱、彈力牆、加速帶、阿鰭），複製回關卡設定表"
+  },
+  {
+   "label": "測試頁與難度報告",
+   "url": "https://fishon100.github.io/pinball-sling/street/test.html",
+   "icon": "flask",
+   "desc": "自動測試、擬人玩家難度報告"
   }
  ]
 }

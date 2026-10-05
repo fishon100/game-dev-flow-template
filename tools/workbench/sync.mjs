@@ -113,6 +113,7 @@ const data = {
   content: indexContent(root, cfg.content_dirs || ["docs/企劃"]),
   name: cfg.name || repo.split("/")[1],
   links: cfg.links || [],
+  tools: cfg.tools || [], // 專案工具（外掛）：框架以外、這個專案自己的工具
   changes, specs,
   requests: pick("需求"), feedback: pick("回饋"),
   commits, runs,

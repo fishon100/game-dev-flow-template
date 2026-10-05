@@ -1,22 +1,13 @@
 {
-  "_說明": "工作台的設定。開新專案時改 name 與 links；spec_dir 跟 .spectra.yaml 一樣。",
+  "_說明": "工作台／管理台的設定。開新專案時改 name、links、tools；spec_dir 跟 .spectra.yaml 一樣。",
   "name": "範例遊戲（接球）",
   "spec_dir": "docs/spectra",
+  "content_dirs": ["docs/企劃"],
   "links": [
-    {
-      "label": "▶ 試玩",
-      "url": "https://fishon100.github.io/game-dev-flow-template/"
-    },
-    {
-      "label": "🧪 測試頁",
-      "url": "https://fishon100.github.io/game-dev-flow-template/test.html"
-    },
-    {
-      "label": "📘 開發流說明",
-      "url": "https://github.com/fishon100/game-dev-flow-template/tree/main/docs/flow"
-    }
+    { "label": "試玩", "url": "https://fishon100.github.io/game-dev-flow-template/" }
   ],
-  "content_dirs": [
-    "docs/企劃"
+  "_tools說明": "專案工具（外掛）：框架以外、這個專案自己的工具，會出現在管理台左側「專案工具」。icon 可用 wrench、table、chart、image、gamepad、code、flask、book、users、globe、tag、play、sparkles",
+  "tools": [
+    { "label": "測試頁", "url": "https://fishon100.github.io/game-dev-flow-template/test.html", "icon": "flask", "desc": "瀏覽器自動測試（版面、畫面）" }
   ]
 }
