@@ -1,5 +1,7 @@
 // 開發管理台：多專案、流程樹、申請單、規則書、內容庫（劇本／角色／世界觀…）、素材庫、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
+// 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -58,6 +60,10 @@ function sideHtml() {
 }
 
 // ---------- 共用元件 ----------
+// 寫回饋／提需求：登入了就在管理台填，沒登入就開 GitHub 表單
+const issueBtns = primary => auth.user
+  ? `<button class="btn ${primary ? "primary" : ""}" data-newissue="回饋">🎮 寫回饋</button><button class="btn" data-newissue="需求">💡 提需求</button>`
+  : `<a class="btn ${primary ? "primary" : ""}" href="${newIssue("feedback")}" target="_blank" rel="noopener">🎮 寫回饋</a><a class="btn" href="${newIssue("request")}" target="_blank" rel="noopener">💡 提需求</a>`;
 const chip = s => `<span class="chip s-${esc(s)}">${esc(s)}</span>`;
 const pct = c => (c.tasks.total ? Math.round((c.tasks.done / c.tasks.total) * 100) : c.archived ? 100 : 0);
 const barHtml = c => `<div class="bar" title="${c.tasks.done}/${c.tasks.total}"><i style="width:${pct(c)}%"></i></div>`;
@@ -83,7 +89,8 @@ function changeDetail(c) {
     <h2 style="margin:8px 0 0;font-size:18px">${esc(c.title)}</h2>
     ${chainHtml(c)}
     <div class="row" style="margin-bottom:12px">
-      ${c.status === "待同意" && c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">👍 看內容並同意</a>` : ""}
+      ${c.status === "待同意" ? (auth.user ? `<button class="btn ok" data-approve="${esc(c.id)}">👍 同意</button>` : c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">👍 看內容並同意</a>` : `<button class="btn ok" data-approve="${esc(c.id)}">👍 登入後同意</button>`) : ""}
+      ${c.issue && !c.archived ? `<button class="btn" data-comment="${esc(c.id)}">💬 留言／提問</button>` : ""}
       <a class="btn" href="${tree(folder)}" target="_blank" rel="noopener">📄 申請單檔案</a>
       ${c.issue ? `<a class="btn" href="${esc(c.issue.url)}" target="_blank" rel="noopener">💬 Issue #${c.issue.number}${c.issue.comments ? `（${c.issue.comments}）` : ""}</a>` : ""}
     </div>
@@ -104,13 +111,13 @@ V.overview = () => {
   const rqOpen = d.requests.filter(i => i.state === "open"), fbOpen = d.feedback.filter(i => i.state === "open");
   const stages = [["💡", "需求", rqOpen.length, "issues"], ["⏳", "待同意", by("待同意").length, "tree"], ["🔧", "已同意／實作中", by("已同意").length + by("實作中").length, "tree"], ["🎮", "待結案", by("待結案").length, "tree"], ["📦", "已結案", arc.length, "tree"]];
   const todo = [
-    ...by("待同意").map(c => `<li><span class="dot"></span><div class="g"><b>${esc(c.title)}</b> 等企劃同意<div class="muted">${esc(c.id)}</div></div>${c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">去同意</a>` : ""}<button class="btn" data-change="${esc(c.id)}">明細</button></li>`),
+    ...by("待同意").map(c => `<li><span class="dot"></span><div class="g"><b>${esc(c.title)}</b> 等企劃同意<div class="muted">${esc(c.id)}</div></div>${auth.user ? `<button class="btn ok" data-approve="${esc(c.id)}">同意</button>` : c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">去同意</a>` : ""}<button class="btn" data-change="${esc(c.id)}">明細</button></li>`),
     ...by("待結案").map(c => `<li><span class="dot"></span><div class="g"><b>${esc(c.title)}</b> 做完了：試玩後說「${esc(c.id)} 結案」</div><button class="btn" data-change="${esc(c.id)}">明細</button></li>`),
     ...(fbOpen.length ? [`<li><span class="dot bad"></span><div class="g">${fbOpen.length} 則回饋還沒處理：對 AI 說「看回饋」</div><button class="btn" data-go="issues">查看</button></li>`] : []),
     ...(d.runs[0]?.conclusion === "failure" ? [`<li><span class="dot bad"></span><div class="g">最近一次「${esc(d.runs[0].name)}」失敗</div><a class="btn" href="${esc(d.runs[0].url)}" target="_blank" rel="noopener">看原因</a></li>`] : []),
   ];
   const content = d.content || [];
-  return `<div class="vh"><h1>${esc(d.name)}</h1><span class="sub">${esc(d.repo)}</span><div class="spacer"></div>${d.links.map(l => `<a class="btn ${/試玩/.test(l.label) ? "primary" : ""}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("")}</div>
+  return `<div class="vh"><h1>${esc(d.name)}</h1><span class="sub">${esc(d.repo)}</span><div class="spacer"></div>${d.links.map(l => `<a class="btn ${/試玩/.test(l.label) ? "primary" : ""}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("")}${issueBtns()}</div>
     <div class="pipe">${stages.map(([ic, l, n, go]) => `<div class="stage" data-go="${go}"><span>${ic} ${l}</span><b>${n}</b></div>`).join("")}</div>
     <div class="grid2">
       <div class="card"><h3>需要處理</h3>${todo.length ? `<ul class="list">${todo.join("")}</ul>` : `<div class="empty">目前沒有等待處理的事 🎉</div>`}</div>
@@ -181,7 +188,7 @@ V.content = () => {
   const files = (S.data.content || []).filter(f => catOf(f) === S.arg);
   const cur = S.doc && files.some(f => f.path === S.doc) ? S.doc : files[0]?.path;
   setTimeout(() => cur && openDoc(cur, "#reader"), 0);
-  return `<div class="vh"><h1>${cat.ic} ${cat.label}</h1><span class="sub">${files.length} 份・唯讀（改內容請到正本：Obsidian／Notion，再說「同步企劃文件」）</span></div>
+  return `<div class="vh"><h1>${cat.ic} ${cat.label}</h1><span class="sub">${files.length} 份${canWrite() ? "" : "・登入後可以直接編輯"}</span><div class="spacer"></div>${canWrite() ? `<button class="btn" data-newdoc="${esc(S.arg)}">＋ 新文件</button>` : ""}</div>
     <div class="split">${docList(files, cur)}<div class="doc" id="reader"><div class="muted">選一份文件</div></div></div>`;
 };
 V.files = () => {
@@ -198,7 +205,7 @@ V.assets = () => {
   const sheets = content.filter(f => f.ext === "csv" && /素材|asset/i.test(f.name));
   const docs = content.filter(f => f.ext === "md" && catOf(f) === "assets");
   setTimeout(() => sheets[0] && loadAssetSheet(sheets[0].path), 0);
-  return `<div class="vh"><h1>🎨 素材庫</h1><span class="sub">圖片 ${imgs.length}・聲音 ${audio.length}・清單 ${docs.length}</span></div>
+  return `<div class="vh"><h1>🎨 素材庫</h1><span class="sub">圖片 ${imgs.length}・聲音 ${audio.length}・清單 ${docs.length}</span><div class="spacer"></div>${canWrite() ? `<button class="btn primary" data-upload>＋ 上傳素材</button>` : ""}</div>
     ${sheets.length ? `<div class="card" style="margin-bottom:14px"><h3>素材進度</h3><div id="assetSheet" class="muted">讀取中…</div></div>` : ""}
     <div class="card" style="margin-bottom:14px"><h3>圖片</h3>${imgs.length ? `<div class="gallery">${imgs.map(f => `<div class="tile" data-img="${esc(f.path)}"><div class="im"><img loading="lazy" src="${raw(f.path)}" alt="${esc(f.title)}"></div><p>${esc(f.name)}</p></div>`).join("")}</div>` : `<div class="empty">還沒有圖片（正式素材放進內容資料夾後會出現在這裡）</div>`}</div>
     ${audio.length ? `<div class="card" style="margin-bottom:14px"><h3>聲音</h3><ul class="list">${audio.map(f => `<li><div class="g">${esc(f.name)}</div><audio controls preload="none" src="${raw(f.path)}"></audio></li>`).join("")}</ul></div>` : ""}
@@ -225,7 +232,7 @@ async function loadAssetSheet(path) {
 V.issues = () => {
   const d = S.data, li = i => `<li><span class="dot ${i.state === "open" ? "" : "ok"}"></span><div class="g"><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a><div class="muted">#${i.number}・${esc(i.user || "")}・${ago(i.created)}${i.comments ? `・💬 ${i.comments}` : ""}</div></div></li>`;
   const open = l => l.filter(i => i.state === "open"), closed = [...d.feedback, ...d.requests].filter(i => i.state !== "open");
-  return `<div class="vh"><h1>💬 回饋與需求</h1><div class="spacer"></div><a class="btn primary" href="${newIssue("feedback")}" target="_blank" rel="noopener">🎮 寫回饋</a><a class="btn" href="${newIssue("request")}" target="_blank" rel="noopener">💡 提需求</a></div>
+  return `<div class="vh"><h1>💬 回饋與需求</h1><div class="spacer"></div>${issueBtns(true)}</div>
     <div class="grid2"><div class="card"><h3>回饋（還沒處理）</h3><ul class="list">${open(d.feedback).map(li).join("") || `<li class="empty">沒有</li>`}</ul></div>
     <div class="card"><h3>需求（還沒處理）</h3><ul class="list">${open(d.requests).map(li).join("") || `<li class="empty">沒有</li>`}</ul></div>
     <div class="card"><h3>已處理</h3><ul class="list">${closed.map(li).join("") || `<li class="empty">還沒有</li>`}</ul></div></div>`;
@@ -242,8 +249,9 @@ V.help = () => `<div class="vh"><h1>❓ 說明</h1></div><div class="card md">
   <h2>這是什麼</h2><p>專案的管理台：所有專案、每張申請單的流程進度、規則書、劇本與角色等企劃內容、素材都在這裡看。手機上快速同意請用 📱 工作台。</p>
   <h2>常用</h2><ul><li><b>流程樹</b>：專案 → 階段（待同意／已同意／實作中／待結案／已結案）→ 申請單 → 提案、規則、設計、同意、任務。點申請單看進度鏈。</li>
   <li><b>同意申請單</b>：申請單明細的「看內容並同意」→ 在 GitHub 勾 ☐ 企劃同意（或 Spectra 桌面版勾任務 0.1、Notion 改「同意」、對 AI 說「同意 xxx」）。</li>
-  <li><b>內容庫</b>：劇本、角色、世界觀、名詞、數值、規劃書。這裡是唯讀；改內容請改正本（Obsidian 或 Notion），再對 AI 說「同步企劃文件」。</li>
-  <li><b>素材庫</b>：圖片、聲音、素材進度表（可依狀態、類別篩選）。</li></ul>
+  <li><b>內容庫</b>：劇本、角色、世界觀、名詞、數值、規劃書。登入後每份文件右上角有「✏️ 編輯」，分類頁有「＋ 新文件」。正本在 Obsidian 的專案，改的內容會在下次「同步企劃文件」寫回 Obsidian。</li>
+  <li><b>素材庫</b>：圖片、聲音、素材進度表（可依狀態、類別篩選）；登入後可以「＋ 上傳素材」。</li></ul>
+  <h2>🔑 登入</h2><p>右上角「登入」→ 按「產生登入碼」（GitHub 權限已勾好）→ 複製貼回來。登入後可以在這裡直接<b>同意申請單、留言、寫回饋、提需求、編輯內容、上傳素材</b>。登入碼只存在這台瀏覽器；共用電腦用完請按頭像登出。</p>
   <h2>資料多新</h2><p>推上 GitHub、Issue 有變動、部署完成時自動更新（約 1 分鐘），另外每小時一次。右上角顯示更新時間，按 ⟳ 重新整理。</p>
   <h2>給程式</h2><p>資料來源：各專案 <code>workbench-data</code> 分支的 <code>data.json</code>（<code>tools/workbench/sync.mjs</code> 產生）。內容庫資料夾在 <code>workbench.config.json</code> 的 <code>content_dirs</code>。完整說明見開發流 <code>08 工作台與遠端操作</code>。</p></div>`;
 
@@ -267,9 +275,12 @@ async function openDoc(path, target) {
   document.querySelectorAll("[data-doc]").forEach(b => b.setAttribute("aria-current", b.dataset.doc === path));
   el.innerHTML = `<div class="muted">讀取中…</div>`;
   try {
-    const r = await fetch(raw(path)); if (!r.ok) throw new Error(r.status);
-    const text = await r.text();
-    const head = `<div class="row" style="margin-bottom:10px"><span class="muted" style="flex:1">${esc(path)}</span><a class="chip" href="${blob(path)}" target="_blank" rel="noopener">在 GitHub 打開</a></div>`;
+    // 剛在管理台存過的檔案，raw 網址可能還是舊的（GitHub 快取約 5 分鐘），先用剛存的內容
+    let text;
+    if (S.docCache?.path === path) text = S.docCache.text;
+    else { const r = await fetch(raw(path) + `?t=${Date.now()}`); if (!r.ok) throw new Error(r.status); text = await r.text(); }
+    const editable = canWrite() && path.endsWith(".md");
+    const head = `<div class="row" style="margin-bottom:10px"><span class="muted" style="flex:1">${esc(path)}</span>${editable ? `<button class="chip" data-edit="${esc(path)}">✏️ 編輯</button>` : ""}<a class="chip" href="${blob(path)}" target="_blank" rel="noopener">在 GitHub 打開</a></div>`;
     if (path.endsWith(".csv")) {
       const rows = parseCsv(text);
       el.innerHTML = head + `<div class="tablewrap"><table class="t"><thead><tr>${(rows[0] || []).map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.slice(1).filter(r => r.some(Boolean)).map(r => `<tr>${r.map(c => `<td class="pre">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
@@ -343,6 +354,162 @@ $("#reload").addEventListener("click", () => load(S.repo));
 $("#theme").addEventListener("click", () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); const nx = cur === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = nx; store.set("console:theme", nx); });
 if (store.get("console:theme")) document.documentElement.dataset.theme = store.get("console:theme");
 
+// ---------- 登入與寫入 ----------
+const canWrite = () => !!auth.user?.canWrite;
+const canTriage = () => !!auth.user?.canTriage;
+function toast(msg, ms = 3500) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), ms); }
+/** 對話框：回傳按下的按鈕 value（取消＝""） */
+function dialog(title, body, buttons = [["", "取消"], ["ok", "確定", "primary"]]) {
+  const d = $("#dlg");
+  d.innerHTML = `<form method="dialog"><div class="dlg-h">${esc(title)}<span class="spacer"></span><button class="ibtn" value="" aria-label="關閉">✕</button></div><div class="dlg-b">${body}</div><div class="dlg-f">${buttons.map(([v, l, c]) => `<button class="btn ${c || ""}" value="${v}">${l}</button>`).join("")}</div></form>`;
+  d.showModal();
+  // 用 submit（按按鈕當下就觸發）而不是 close 事件：背景分頁裡 close 事件可能會延遲
+  return new Promise(res => {
+    const form = d.querySelector("form");
+    form.addEventListener("submit", e => res(e.submitter?.value || ""), { once: true });
+    d.addEventListener("cancel", () => res(""), { once: true });
+  });
+}
+function renderAuth() {
+  const b = $("#loginBtn");
+  if (auth.user) { b.innerHTML = `<span class="who"><img src="${esc(auth.user.avatar)}" alt="">${esc(auth.user.login)}${auth.user.canWrite ? "" : " 👀"}</span>`; b.title = auth.user.canWrite ? "已登入：可以同意、留言、寫回饋、編輯內容" : "已登入，但對這個專案只有讀取權限"; }
+  else { b.textContent = "🔑 登入"; b.title = "登入後可以在管理台直接同意、留言、寫回饋、編輯內容"; }
+}
+async function checkAuth() {
+  if (!auth.token || !S.repo) { auth.user = null; renderAuth(); return; }
+  try { await verify(S.repo); } catch (e) { auth.user = null; toast("登入狀態：" + e.message, 6000); }
+  renderAuth(); if (S.data) render();
+}
+async function loginFlow() {
+  if (auth.user) {
+    const v = await dialog("帳號", `<p><span class="who"><img src="${esc(auth.user.avatar)}" alt=""><b>${esc(auth.user.name)}</b>（${esc(auth.user.login)}）</span></p><p>對「${esc(S.repo)}」的權限：${auth.user.canWrite ? "✅ 可以同意、留言、寫回饋、編輯內容" : auth.user.canTriage ? "可以同意、留言、寫回饋（不能編輯內容）" : "👀 只能看"}</p><p class="muted">登入碼存在這台瀏覽器。換電腦、共用電腦用完請登出。</p>`, [["", "關閉"], ["out", "登出", "primary"]]);
+    if (v === "out") { auth.clear(); renderAuth(); render(); toast("已登出"); }
+    return;
+  }
+  const owner = S.repo.split("/")[0];
+  const v = await dialog("登入 GitHub", `
+    <p>登入後可以在管理台直接<b>同意申請單、留言、寫回饋、提需求、編輯企劃內容、上傳素材</b>。只要做一次（每台電腦／瀏覽器各一次）。</p>
+    <ol class="steps">
+      <li>按 <a href="${tokenUrl(owner)}" target="_blank" rel="noopener"><b>產生登入碼</b></a>（會打開 GitHub，權限已經幫你勾好）
+        <ul class="muted"><li>「Repository access」選 <b>All repositories</b> 或勾選要管理的專案</li><li>拉到最下面按 <b>Generate token</b>，複製那串 <code>github_pat_…</code></li><li>專案不是你自己的（你是協作者）：改用 <a href="${classicTokenUrl}" target="_blank" rel="noopener">傳統登入碼</a>（勾 repo）</li></ul></li>
+      <li>貼在下面，按「登入」</li>
+    </ol>
+    <label class="fld"><span>登入碼</span><input name="token" type="password" autocomplete="off" placeholder="github_pat_… 或 ghp_…" required></label>
+    <label class="row"><input type="checkbox" name="remember" checked> 記住這台電腦（共用電腦請取消）</label>
+    <p class="muted">登入碼只存在你的瀏覽器、只會送到 GitHub。不要貼給別人，也不要貼在聊天裡。</p>`, [["", "取消"], ["ok", "登入", "primary"]]);
+  if (v !== "ok") return;
+  const f = $("#dlg form");
+  const token = f.token.value.trim();
+  if (!token) return;
+  auth.save(token, f.remember.checked);
+  try { const u = await verify(S.repo); renderAuth(); render(); toast(`歡迎 ${u.login}！${u.canWrite ? "" : "（這個專案你只有讀取權限）"}`); }
+  catch (e) { auth.clear(); renderAuth(); toast("登入失敗：" + e.message, 7000); }
+}
+$("#loginBtn").addEventListener("click", loginFlow);
+
+async function doApprove(id) {
+  const c = S.data.changes.find(x => x.id === id); if (!c) return;
+  const v = await dialog("同意申請單", `<p>確定同意 <b>${esc(c.title)}</b>（${esc(c.id)}）？</p>${c.confirm ? `<div class="ask">❓ ${esc(c.confirm)}</div>` : ""}<p class="muted">同意後 AI 就可以開始實作。如果還有疑問，請改用「留言」。</p>`, [["", "取消"], ["ok", "👍 同意", "ok"]]);
+  if (v !== "ok") return;
+  try { const how = await approveChange(S.repo, c, S.data.specDir, S.data.branch); toast(how === "issue" ? "已同意 ✅ 約 1 分鐘後任務 0.1 會自動打勾" : "已同意 ✅ 已寫入任務 0.1"); c.tasks.approved = true; c.status = "已同意"; c.tasks.approvalNote = `企劃於管理台同意（${auth.user.login}）`; render(); }
+  catch (e) { toast("同意失敗：" + e.message, 7000); }
+}
+async function doComment(id) {
+  const c = S.data.changes.find(x => x.id === id); if (!c?.issue) return;
+  const v = await dialog(`留言：${c.title}`, `<label class="fld"><span>想說什麼（問題、要修改的地方都可以）</span><textarea name="msg" required placeholder="例：拖尾顏色跟著街區配色，手機上請再短一點"></textarea></label><p class="muted">留言會出現在申請單 Issue；對 AI 說「看申請單」，AI 會照留言修改。</p>`, [["", "取消"], ["ok", "送出留言", "primary"]]);
+  if (v !== "ok") return;
+  const msg = $("#dlg form").msg.value.trim(); if (!msg) return;
+  try { await comment(S.repo, c.issue.number, msg); c.issue.comments = (c.issue.comments || 0) + 1; toast("已送出留言 💬"); render(); }
+  catch (e) { toast("留言失敗：" + e.message, 7000); }
+}
+async function doNewIssue(kind) {
+  const fb = kind === "回饋";
+  const v = await dialog(fb ? "🎮 寫回饋" : "💡 提需求", `
+    <label class="fld"><span>${fb ? "一句話說是什麼問題" : "一句話說想要什麼"}</span><input name="title" required placeholder="${fb ? "例：第 5 關球常常卡在右上角" : "例：加一個每日挑戰關卡"}"></label>
+    ${fb ? `<label class="fld"><span>等級</span><select name="level"><option>🔴 必修（不改不行）</option><option selected>🟡 建議（改了會更好）</option><option>🟢 很好（請保留不要動）</option></select></label>
+      <label class="fld"><span>試玩的版本或日期</span><input name="version" placeholder="v3.7.3 或 10/6"></label>
+      <label class="fld"><span>用什麼玩</span><select name="device"><option>手機</option><option>平板</option><option>電腦</option></select></label>`
+    : `<label class="fld"><span>優先</span><select name="priority"><option>🔴 必做</option><option selected>🟡 想做</option><option>⚪ 之後再說</option></select></label>`}
+    <label class="fld"><span>${fb ? "發生什麼事／想要什麼感覺" : "玩家遇到什麼問題／想要什麼"}</span><textarea name="what" required></textarea></label>
+    ${fb ? "" : `<label class="fld"><span>想法、參考（選填）</span><textarea name="idea" style="min-height:70px"></textarea></label><label class="fld"><span>怎樣算做好了（選填）</span><input name="done" placeholder="例：第 1 區新手每關最多掉 1 顆愛心"></label>`}
+    <label class="fld"><span>截圖（選填，可以多張）</span><input name="shots" type="file" accept="image/*" multiple></label>
+    <p class="muted">名詞請用名詞表裡的名字。送出後對 AI 說「${fb ? "看回饋" : "看需求"}」。</p>`, [["", "取消"], ["ok", "送出", "primary"]]);
+  if (v !== "ok") return;
+  const f = $("#dlg form");
+  const fields = fb
+    ? { __title: f.title.value.trim(), "等級": f.level.value, "試玩的版本或日期": f.version.value.trim(), "發生什麼事／想要什麼感覺": f.what.value.trim(), "用什麼玩": f.device.value }
+    : { __title: f.title.value.trim(), "優先": f.priority.value, "玩家遇到什麼問題／想要什麼": f.what.value.trim(), "想法、參考": f.idea.value.trim(), "怎樣算做好了": f.done.value.trim() };
+  if (!fields.__title) return;
+  toast("送出中…", 20000);
+  try {
+    const i = await createIssue(S.repo, kind, fields, [...(f.shots.files || [])], S.data.branch);
+    (fb ? S.data.feedback : S.data.requests).unshift({ number: i.number, title: i.title, url: i.html_url, state: "open", created: i.created_at, user: auth.user.login, labels: [kind], comments: 0 });
+    toast(`已送出 #${i.number} ✅`); render();
+  } catch (e) { toast("送出失敗：" + e.message, 7000); }
+}
+
+async function doEdit(path, preset) {
+  const el = $("#reader") || $("#dd"); if (!el) return;
+  el.innerHTML = `<div class="muted">讀取中…</div>`;
+  let file = preset;
+  if (!file) try { file = await readFile(S.repo, path, S.data.branch); } catch (e) { el.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
+  const mirror = /正本在 Obsidian|鏡像自 Obsidian/.test(file.text);
+  el.innerHTML = `<div class="editor">
+    <div class="row" style="margin-bottom:10px"><b style="flex:1">✏️ ${esc(path)}</b><button class="btn" data-ed="preview">預覽</button><button class="btn" data-ed="cancel">取消</button><button class="btn primary" data-ed="save">儲存</button></div>
+    ${mirror ? `<div class="banner">這份的正本在 Obsidian，兩邊雙向同步：在這裡儲存後，下次「同步企劃文件」會寫回 Obsidian（兩邊都改過會提醒，不會互相蓋掉）。</div>` : ""}
+    <textarea id="edText" spellcheck="false">${esc(file.text)}</textarea>
+    <div class="md doc" id="edPrev" hidden></div>
+    <label class="fld" style="margin-top:10px"><span>這次改了什麼（會記在 GitHub 的修改紀錄）</span><input id="edMsg" placeholder="例：阿鰭的外型描述改成藍綠色"></label></div>`;
+  el.querySelector('[data-ed="preview"]').onclick = () => {
+    const p = $("#edPrev"), ta = $("#edText"), showing = !p.hidden;
+    if (!showing) p.innerHTML = window.DOMPurify && window.marked ? DOMPurify.sanitize(marked.parse(ta.value.replace(/^---\n[\s\S]*?\n---\n/, ""))) : esc(ta.value);
+    p.hidden = showing; ta.hidden = !showing;
+    el.querySelector('[data-ed="preview"]').textContent = showing ? "預覽" : "回到編輯";
+  };
+  el.querySelector('[data-ed="cancel"]').onclick = () => openDoc(path, el);
+  el.querySelector('[data-ed="save"]').onclick = async () => {
+    const text = $("#edText").value, msg = $("#edMsg").value.trim() || `更新 ${path.split("/").pop()}`;
+    if (text === file.text) { toast("沒有改動"); return; }
+    try { const sha = await saveFile(S.repo, path, text, `內容：${msg}（管理台，${auth.user.login}）`, file.sha, S.data.branch); file = { text, sha }; toast("已儲存 ✅ GitHub 上的檔案已更新"); S.docCache = { path, text, sha }; openDoc(path, el); }
+    catch (e) { toast("儲存失敗：" + e.message, 7000); }
+  };
+}
+async function doNewDoc(catKey) {
+  const cat = CATS.find(c => c.key === catKey);
+  const files = (S.data.content || []).filter(f => catOf(f) === catKey);
+  const folder = files[0] ? files[0].path.split("/").slice(0, -1).join("/") : `${(S.data.contentDirs || ["docs/企劃"])[0]}/知識庫/${cat?.label || "其他"}`;
+  const v = await dialog(`＋ 新增${cat?.label || ""}文件`, `<label class="fld"><span>標題（也是檔名）</span><input name="title" required placeholder="例：${catKey === "chars" ? "新角色－小黑" : "第 2 區劇情"}"></label><p class="muted">會建立在 <code>${esc(folder)}/</code></p>`, [["", "取消"], ["ok", "建立", "primary"]]);
+  if (v !== "ok") return;
+  const title = $("#dlg form").title.value.trim().replace(/[\\/:*?"<>|]/g, "－"); if (!title) return;
+  const path = `${folder}/${title}.md`;
+  const text = `# ${title}\n\n`;
+  try { const sha = await saveFile(S.repo, path, text, `內容：新增 ${title}（管理台，${auth.user.login}）`, undefined, S.data.branch); S.data.content.push({ path, name: title + ".md", ext: "md", size: 0, title }); S.doc = path; S.docCache = { path, text }; render(); setTimeout(() => doEdit(path, { text, sha }), 50); toast("已建立，開始編輯吧"); }
+  catch (e) { toast("建立失敗：" + e.message, 7000); }
+}
+async function doUpload() {
+  const dir = `${(S.data.contentDirs || ["docs/企劃"])[0]}/圖`;
+  const v = await dialog("＋ 上傳素材", `<label class="fld"><span>選擇檔案（圖片或聲音，可以多個）</span><input name="files" type="file" accept="image/*,audio/*" multiple required></label><p class="muted">會放到 <code>${esc(dir)}/</code>。檔名請用英文小寫＋底線（例：<code>fish_sleepy.png</code>）。</p>`, [["", "取消"], ["ok", "上傳", "primary"]]);
+  if (v !== "ok") return;
+  const files = [...($("#dlg form").files.files || [])]; if (!files.length) return;
+  toast("上傳中…", 30000);
+  try {
+    for (const file of files) { const path = `${dir}/${file.name}`; await uploadFile(S.repo, path, file, `素材：上傳 ${file.name}（管理台，${auth.user.login}）`, S.data.branch); S.data.content.push({ path, name: file.name, ext: file.name.split(".").pop().toLowerCase(), size: file.size, title: file.name.replace(/\.[^.]+$/, "") }); }
+    toast(`已上傳 ${files.length} 個檔案 ✅`); render();
+  } catch (e) { toast("上傳失敗：" + e.message, 7000); }
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-approve],[data-comment],[data-newissue],[data-edit],[data-newdoc],[data-upload]");
+  if (!t) return;
+  e.preventDefault();
+  if (!auth.user) { loginFlow(); return; }
+  if (t.dataset.approve) doApprove(t.dataset.approve);
+  else if (t.dataset.comment) doComment(t.dataset.comment);
+  else if (t.dataset.newissue) doNewIssue(t.dataset.newissue);
+  else if (t.dataset.edit) { if (!canWrite()) return toast("你對這個專案沒有編輯權限"); doEdit(t.dataset.edit); }
+  else if (t.dataset.newdoc) { if (!canWrite()) return toast("你對這個專案沒有編輯權限"); doNewDoc(t.dataset.newdoc); }
+  else if (t.dataset.upload !== undefined) { if (!canWrite()) return toast("你對這個專案沒有編輯權限"); doUpload(); }
+});
+
 // ---------- 載入 ----------
 const mergeProjects = (base, local) => [...base, ...local.filter(l => !base.some(b => b.repo === l.repo))];
 async function fetchData(repo) {
@@ -368,6 +535,7 @@ function setData(d, cached) {
   $("#toWorkbench").href = `../workbench/?repo=${encodeURIComponent(S.repo)}`;
   store.set("console:last", S.repo);
   go(location.hash.slice(1) || "overview", false);
+  if (auth.token && auth.user?.repo !== S.repo) checkAuth().then(() => { if (auth.user) auth.user.repo = S.repo; });
 }
 function switchProject(repo, push = true) {
   S.sel = ""; S.doc = ""; hideDetail();
@@ -386,6 +554,8 @@ async function loadProjectSums() {
 }
 
 (async () => {
+  if (qs.has("mock")) await import("./mock.js"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}
   S.base = base;

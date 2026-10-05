@@ -5,7 +5,7 @@
 - **骨幹**：[Spectra](https://github.com/kaochenlong/spectra-app) 規格驅動開發（SDD）＋自動測試（TDD）
 - **分工**：人寫需求、確認、試玩（Notion）；AI 寫申請單、程式、測試、部署（GitHub）
 - **預覽**：每次推上 GitHub 自動跑測試、部署到 GitHub Pages、手機收到通知
-- **💻 管理台**：像 Spectra 桌面版的專業介面——多專案目錄、流程樹、申請單進度鏈、規則書、劇本／角色／世界觀等內容庫、素材庫 → [打開](https://fishon100.github.io/game-dev-flow-template/console/?repo=fishon100/pinball-sling)
+- **💻 管理台**：像 Spectra 桌面版的專業介面——多專案目錄、流程樹、申請單進度鏈、規則書、劇本／角色／世界觀等內容庫、素材庫；**登入後直接同意、留言、寫回饋、編輯內容、上傳素材** → [打開](https://fishon100.github.io/game-dev-flow-template/console/?repo=fishon100/pinball-sling)
 - **🧭 工作台**：給不寫程式的人的網頁（手機可加到主畫面）：等我處理、申請單進度、同意、寫回饋、提需求、規則書、上線紀錄 → [打開範例](https://fishon100.github.io/game-dev-flow-template/workbench/?repo=fishon100/pinball-sling)
 - **在哪裡都能同意**：工作台／GitHub Issue（手機）、Notion、Spectra 桌面版、或跟 AI 說——最後都記在申請單任務 0.1
 
