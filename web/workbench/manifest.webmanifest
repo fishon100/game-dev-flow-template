@@ -4,8 +4,10 @@
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f6f5fb",
-  "theme_color": "#5b3fd6",
+  "theme_color": "#4338CA",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }

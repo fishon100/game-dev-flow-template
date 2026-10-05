@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>開發管理台</title>
 <meta name="theme-color" content="#16151f">
-<link rel="icon" href="../workbench/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../workbench/icon-180.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <style>
@@ -33,7 +34,7 @@ a { color: var(--accent); }
 button { font: inherit; color: inherit; }
 .app { display: grid; grid-template-columns: 240px 1fr; grid-template-rows: 52px 1fr; height: 100vh; height: 100dvh; }
 /* 上方列 */
-.top { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
+.top { grid-column: 1 / -1; position: relative; z-index: 40; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; white-space: nowrap; }
 .brand img { width: 22px; height: 22px; }
 .proj { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--side); cursor: pointer; min-width: 0; max-width: 340px; }
@@ -159,6 +160,11 @@ li.closed > ul { display: none; }
 .err { background: var(--bad-soft); color: var(--bad); }
 .scrim { display: none; }
 [hidden] { display: none !important; }
+.menu { position: absolute; top: 48px; min-width: 260px; max-width: calc(100vw - 16px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 40px rgb(0 0 0 / .18); padding: 6px; z-index: 60; }
+.menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.menu button:hover, .menu button[aria-current="true"] { background: var(--hover); }
+.menu small { display: block; color: var(--faint); font-size: 12px; }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 4px; }
 dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(560px, calc(100vw - 32px)); background: var(--panel); color: var(--ink); box-shadow: 0 20px 60px rgb(0 0 0 / .25); }
 dialog::backdrop { background: rgb(10 8 20 / .45); }
 .dlg-h { display: flex; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 15px; }
@@ -192,8 +198,8 @@ dialog::backdrop { background: rgb(10 8 20 / .45); }
 <div class="app">
   <header class="top">
     <button class="ibtn menu-btn" id="menu" aria-label="選單">☰</button>
-    <div class="brand"><img src="../workbench/icon.svg" alt=""><span>開發管理台</span></div>
-    <button class="proj" id="projBtn" title="切換專案"><span>📁</span><b id="projName">讀取中…</b><span class="muted">▾</span></button>
+    <div class="brand"><img src="icon.svg" alt=""><span>開發管理台</span></div>
+    <button class="proj" id="projBtn" title="切換專案" aria-haspopup="menu" aria-expanded="false"><span>📁</span><b id="projName">讀取中…</b><span class="muted">▾</span></button>
     <div class="spacer"></div>
     <span class="fresh" id="fresh"></span>
     <button class="ibtn" id="reload" title="重新整理">⟳</button>

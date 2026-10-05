@@ -25,16 +25,18 @@ export async function gh(path, { method = "GET", body } = {}) {
   if (r.status === 401) throw new Error("登入碼無效或過期了，請重新登入");
   if (r.status === 403 || r.status === 404) throw new Error(`沒有權限（${r.status}）：登入碼要包含這個專案，並有 Issues 與 Contents 的讀寫權限`);
   if (r.status === 409) throw new Error("檔案剛被別人改過，請重新整理後再改一次");
+  if (r.status === 422) { const t = await r.text(); const e = new Error(/sha/.test(t) ? "已經有同名的檔案了，請換一個名字" : `GitHub 不接受這個內容：${t.slice(0, 160)}`); e.status = 422; throw e; }
   if (!r.ok) throw new Error(`GitHub 回應 ${r.status}：${(await r.text()).slice(0, 200)}`);
   return r.status === 204 ? null : r.json();
 }
 
 /** 驗證登入碼，並確認對這個專案有寫入權限 */
 export async function verify(repo) {
-  const user = await gh("/user");
-  const r = await gh(`/repos/${repo}`);
-  const p = r.permissions || {};
-  auth.user = { login: user.login, avatar: user.avatar_url, name: user.name || user.login, canWrite: !!(p.push || p.maintain || p.admin), canTriage: !!(p.triage || p.push || p.maintain || p.admin) };
+  const user = await gh("/user"); // 登入碼本身無效 → 這裡就會丟錯（真的沒登入）
+  let p = {}, noAccess = false;
+  try { p = (await gh(`/repos/${repo}`)).permissions || {}; }
+  catch { noAccess = true; } // 登入碼沒包含這個專案：保持登入，只是這個專案不能寫
+  auth.user = { login: user.login, avatar: user.avatar_url, name: user.name || user.login, repo, noAccess, canWrite: !!(p.push || p.maintain || p.admin), canTriage: !!(p.triage || p.push || p.maintain || p.admin) };
   return auth.user;
 }
 
@@ -62,11 +64,18 @@ export async function saveFile(repo, path, text, message, sha, branch = "main") 
   const r = await gh(`/repos/${repo}/contents/${encPath(path)}`, { method: "PUT", body: { message, content: b64encode(text), branch, ...(sha ? { sha } : {}) } });
   return r.content?.sha;
 }
-/** 上傳圖片或其他二進位檔 */
+/** 上傳圖片或其他二進位檔。同名檔案已存在時自動改名（檔名-2、檔名-3…），不會蓋掉別人的檔案。回傳 { path, url } */
 export async function uploadFile(repo, path, file, message, branch = "main") {
   const content = bufToB64(await file.arrayBuffer());
-  await gh(`/repos/${repo}/contents/${encPath(path)}`, { method: "PUT", body: { message, content, branch } });
-  return `https://raw.githubusercontent.com/${repo}/${branch}/${encPath(path)}`;
+  const dot = path.lastIndexOf("."), stem = dot > path.lastIndexOf("/") ? path.slice(0, dot) : path, ext = dot > path.lastIndexOf("/") ? path.slice(dot) : "";
+  for (let n = 1; n <= 20; n++) {
+    const p = n === 1 ? path : `${stem}-${n}${ext}`;
+    try {
+      await gh(`/repos/${repo}/contents/${encPath(p)}`, { method: "PUT", body: { message, content, branch } });
+      return { path: p, url: `https://raw.githubusercontent.com/${repo}/${branch}/${encPath(p)}` };
+    } catch (e) { if (e.status !== 422) throw e; }
+  }
+  throw new Error("同名檔案太多了，請換一個檔名");
 }
 
 const APPROVE_RE = /^- \[( |x|X)\] 企劃同意/m;
@@ -77,6 +86,7 @@ export async function approveChange(repo, change, specDir, branch) {
   if (change.issue?.number) {
     const issue = await gh(`/repos/${repo}/issues/${change.issue.number}`);
     if (!APPROVE_RE.test(issue.body || "")) throw new Error("這個 Issue 裡找不到「企劃同意」勾選框");
+    if (/^- \[[xX]\] 企劃同意/m.test(issue.body)) return "already"; // 已經同意過（例如重新整理後又按一次）：不重複留言
     await gh(`/repos/${repo}/issues/${change.issue.number}`, { method: "PATCH", body: { body: issue.body.replace(APPROVE_RE, "- [x] 企劃同意") } });
     await gh(`/repos/${repo}/issues/${change.issue.number}/comments`, { method: "POST", body: { body: `👍 ${who} 在管理台同意了這張申請單。` } });
     return "issue";
@@ -92,15 +102,16 @@ export async function approveChange(repo, change, specDir, branch) {
 export const comment = (repo, number, text) => gh(`/repos/${repo}/issues/${number}/comments`, { method: "POST", body: { body: text } });
 
 /** 開回饋／需求 Issue（內文格式跟 GitHub 表單一樣，AI 讀起來一致） */
-export async function createIssue(repo, kind, fields, images = [], branch = "main") {
+export async function createIssue(repo, kind, fields, images = [], branch = "main", contentDir = "docs/企劃") {
   const who = auth.user?.login || "管理台";
   const urls = [];
   for (const file of images) {
     const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
     const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-    const path = `docs/企劃/圖/${kind}/${stamp}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
-    urls.push(await uploadFile(repo, path, file, `${kind}截圖（管理台，${who}）`, branch));
+    const path = `${contentDir}/圖/${kind}/${stamp}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+    urls.push((await uploadFile(repo, path, file, `${kind}截圖（管理台，${who}）`, branch)).url);
   }
+  fields = { ...fields, __title: String(fields.__title || "").replace(new RegExp(`^${kind}[：:]\\s*`), "") }; // 使用者自己打了「回饋：」就不要重複
   const { __title, ...rest } = fields;
   const sections = Object.entries(rest).filter(([, v]) => v).map(([k, v]) => `### ${k}\n\n${v}`);
   if (urls.length) sections.push(`### 截圖\n\n${urls.map(u => `![截圖](${u})`).join("\n")}`);

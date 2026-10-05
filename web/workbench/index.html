@@ -6,7 +6,8 @@
 <title>開發工作台</title>
 <meta name="theme-color" content="#5b3fd6">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
 <style>
 :root {
   --bg: #f6f5fb; --card: #ffffff; --ink: #1d1b29; --muted: #6b6880; --line: #e6e3f0;
@@ -199,9 +200,11 @@ code { background: var(--brand-soft); padding: 1px 6px; border-radius: 6px; font
 <script>
 (() => {
   const qs = new URLSearchParams(location.search);
-  // 看哪個 repo：網址 ?repo=帳號/名稱 優先；否則從 <帳號>.github.io/<repo>/ 推算
+  // 看哪個 repo：網址 ?repo=帳號/名稱 優先；再來是上次看的（加到主畫面後開啟時網址沒有 ?repo）；最後從 <帳號>.github.io/<repo>/ 推算
   const guess = location.hostname.endsWith(".github.io") ? `${location.hostname.split(".")[0]}/${location.pathname.split("/")[1]}` : "";
-  const repo = qs.get("repo") || guess || "fishon100/game-dev-flow-template";
+  let last = null; try { last = localStorage.getItem("workbench:last"); } catch {}
+  const repo = qs.get("repo") || last || guess || "fishon100/game-dev-flow-template";
+  try { localStorage.setItem("workbench:last", repo); } catch {}
   let repoUrl = `https://github.com/${repo}`; // 讀到資料後改用資料裡的 repo
   const DATA = qs.get("data") || `https://raw.githubusercontent.com/${repo}/workbench-data/data.json`; // ?data= 給本機預覽用
   const CACHE = `workbench:${repo}`;
@@ -254,7 +257,7 @@ code { background: var(--brand-soft); padding: 1px 6px; border-radius: 6px; font
     window.__data = d;
     repoUrl = d.repoUrl || repoUrl;
     document.title = `${d.name}｜開發工作台`;
-    $("#proj").textContent = `🧭 ${d.name}`;
+    $("#proj").innerHTML = `<img src="icon.svg" alt="" style="width:22px;height:22px;vertical-align:-5px;margin-right:6px">${esc(d.name)}`;
     $("#fresh").textContent = `${fromCache ? "離線資料・" : ""}更新於 ${ago(d.generatedAt)}`;
     const active = d.changes.filter(c => !c.archived).sort((a, b) => ORDER[a.status] - ORDER[b.status]);
     const archived = d.changes.filter(c => c.archived);

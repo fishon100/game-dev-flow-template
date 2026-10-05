@@ -61,7 +61,7 @@ function sideHtml() {
 
 // ---------- 共用元件 ----------
 // 寫回饋／提需求：登入了就在管理台填，沒登入就開 GitHub 表單
-const issueBtns = primary => auth.user
+const issueBtns = primary => canTriage()
   ? `<button class="btn ${primary ? "primary" : ""}" data-newissue="回饋">🎮 寫回饋</button><button class="btn" data-newissue="需求">💡 提需求</button>`
   : `<a class="btn ${primary ? "primary" : ""}" href="${newIssue("feedback")}" target="_blank" rel="noopener">🎮 寫回饋</a><a class="btn" href="${newIssue("request")}" target="_blank" rel="noopener">💡 提需求</a>`;
 const chip = s => `<span class="chip s-${esc(s)}">${esc(s)}</span>`;
@@ -89,8 +89,8 @@ function changeDetail(c) {
     <h2 style="margin:8px 0 0;font-size:18px">${esc(c.title)}</h2>
     ${chainHtml(c)}
     <div class="row" style="margin-bottom:12px">
-      ${c.status === "待同意" ? (auth.user ? `<button class="btn ok" data-approve="${esc(c.id)}">👍 同意</button>` : c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">👍 看內容並同意</a>` : `<button class="btn ok" data-approve="${esc(c.id)}">👍 登入後同意</button>`) : ""}
-      ${c.issue && !c.archived ? `<button class="btn" data-comment="${esc(c.id)}">💬 留言／提問</button>` : ""}
+      ${c.status === "待同意" ? (canTriage() ? approveBtn(c) : c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">👍 看內容並同意</a>` : `<button class="btn ok" data-approve="${esc(c.id)}">👍 登入後同意</button>`) : ""}
+      ${c.issue && !c.archived && (canTriage() || !auth.user) ? `<button class="btn" data-comment="${esc(c.id)}">💬 留言／提問</button>` : ""}
       <a class="btn" href="${tree(folder)}" target="_blank" rel="noopener">📄 申請單檔案</a>
       ${c.issue ? `<a class="btn" href="${esc(c.issue.url)}" target="_blank" rel="noopener">💬 Issue #${c.issue.number}${c.issue.comments ? `（${c.issue.comments}）` : ""}</a>` : ""}
     </div>
@@ -111,7 +111,7 @@ V.overview = () => {
   const rqOpen = d.requests.filter(i => i.state === "open"), fbOpen = d.feedback.filter(i => i.state === "open");
   const stages = [["💡", "需求", rqOpen.length, "issues"], ["⏳", "待同意", by("待同意").length, "tree"], ["🔧", "已同意／實作中", by("已同意").length + by("實作中").length, "tree"], ["🎮", "待結案", by("待結案").length, "tree"], ["📦", "已結案", arc.length, "tree"]];
   const todo = [
-    ...by("待同意").map(c => `<li><span class="dot"></span><div class="g"><b>${esc(c.title)}</b> 等企劃同意<div class="muted">${esc(c.id)}</div></div>${auth.user ? `<button class="btn ok" data-approve="${esc(c.id)}">同意</button>` : c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">去同意</a>` : ""}<button class="btn" data-change="${esc(c.id)}">明細</button></li>`),
+    ...by("待同意").map(c => `<li><span class="dot"></span><div class="g"><b>${esc(c.title)}</b> 等企劃同意<div class="muted">${esc(c.id)}</div></div>${canTriage() ? approveBtn(c, "同意") : c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">去同意</a>` : ""}<button class="btn" data-change="${esc(c.id)}">明細</button></li>`),
     ...by("待結案").map(c => `<li><span class="dot"></span><div class="g"><b>${esc(c.title)}</b> 做完了：試玩後說「${esc(c.id)} 結案」</div><button class="btn" data-change="${esc(c.id)}">明細</button></li>`),
     ...(fbOpen.length ? [`<li><span class="dot bad"></span><div class="g">${fbOpen.length} 則回饋還沒處理：對 AI 說「看回饋」</div><button class="btn" data-go="issues">查看</button></li>`] : []),
     ...(d.runs[0]?.conclusion === "failure" ? [`<li><span class="dot bad"></span><div class="g">最近一次「${esc(d.runs[0].name)}」失敗</div><a class="btn" href="${esc(d.runs[0].url)}" target="_blank" rel="noopener">看原因</a></li>`] : []),
@@ -272,13 +272,16 @@ const resolvePath = (base, rel) => { const parts = base.split("/").slice(0, -1);
 async function openDoc(path, target) {
   const el = typeof target === "string" ? $(target) : target; if (!el) return;
   S.doc = path;
+  const req = (S.docReq = (S.docReq || 0) + 1); // 快速連點時，只顯示最後點的那一份
   document.querySelectorAll("[data-doc]").forEach(b => b.setAttribute("aria-current", b.dataset.doc === path));
   el.innerHTML = `<div class="muted">讀取中…</div>`;
   try {
-    // 剛在管理台存過的檔案，raw 網址可能還是舊的（GitHub 快取約 5 分鐘），先用剛存的內容
+    // 剛在管理台存過的檔案，raw 網址可能還是舊的（GitHub 快取約 5 分鐘），10 分鐘內先用剛存的內容
     let text;
-    if (S.docCache?.path === path) text = S.docCache.text;
+    const cached = S.saved?.[`${S.repo}:${path}`];
+    if (cached && Date.now() - cached.at < 10 * 60000) text = cached.text;
     else { const r = await fetch(raw(path) + `?t=${Date.now()}`); if (!r.ok) throw new Error(r.status); text = await r.text(); }
+    if (req !== S.docReq) return;
     const editable = canWrite() && path.endsWith(".md");
     const head = `<div class="row" style="margin-bottom:10px"><span class="muted" style="flex:1">${esc(path)}</span>${editable ? `<button class="chip" data-edit="${esc(path)}">✏️ 編輯</button>` : ""}<a class="chip" href="${blob(path)}" target="_blank" rel="noopener">在 GitHub 打開</a></div>`;
     if (path.endsWith(".csv")) {
@@ -298,8 +301,9 @@ async function openDoc(path, target) {
       if ((S.data.content || []).some(f => f.path === p)) { a.href = "#"; a.addEventListener("click", e => { e.preventDefault(); openDoc(p, el); }); }
       else { a.href = blob(p); a.target = "_blank"; a.rel = "noopener"; }
     });
-  } catch (e) { el.innerHTML = `<div class="err card">讀不到這份文件（${esc(e.message)}）</div>`; }
+  } catch (e) { if (req === S.docReq) el.innerHTML = `<div class="err card">讀不到這份文件（${esc(e.message)}）</div>`; }
 }
+const remember = (path, text) => { S.saved = { ...(S.saved || {}), [`${S.repo}:${path}`]: { text, at: Date.now() } }; };
 
 // ---------- 明細面板 ----------
 function showDetail(html) { const d = $("#detail"); d.innerHTML = html; d.classList.add("open"); d.scrollTop = 0; }
@@ -311,15 +315,18 @@ function selectChange(id) {
 }
 
 // ---------- 路由與繪製 ----------
+const urlFor = (repo, route) => `${location.pathname}?repo=${encodeURIComponent(repo)}${qs.get("data") ? `&data=${encodeURIComponent(qs.get("data"))}` : ""}${qs.has("mock") ? "&mock=1" : ""}#${route}`;
 function go(route, push = true) {
+  if (!leaveOk()) { history.replaceState(null, "", urlFor(S.repo, [S.view, S.arg].filter(Boolean).join("/"))); return; }
   const [v, ...rest] = route.split("/");
   S.view = V[v] ? v : "overview"; S.arg = rest.join("/");
-  if (push) history.pushState(null, "", `${location.pathname}?repo=${encodeURIComponent(S.repo)}${qs.get("data") ? `&data=${encodeURIComponent(qs.get("data"))}` : ""}#${route}`);
-  render(); document.body.classList.remove("drawer");
+  if (push) history.pushState(null, "", urlFor(S.repo, route));
+  closeProjMenu(); render(); document.body.classList.remove("drawer");
 }
 function render() {
   if (!S.data) return;
   $("#side").innerHTML = sideHtml();
+  if (S.dirty && $("#edText")) return; // 編輯中：只更新側欄，不要把編輯器洗掉
   $("#view").innerHTML = V[S.view]();
   $("#view").scrollTop = 0;
   if (S.view === "specs" && S.arg) document.getElementById("spec-" + S.arg)?.scrollIntoView({ block: "center" });
@@ -333,10 +340,10 @@ document.addEventListener("click", e => {
   if (t.classList.contains("tw") && !t.classList.contains("leaf")) { e.stopPropagation(); t.closest("li").classList.toggle("closed"); return; }
   if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); return; }
   if (t.dataset.change) { selectChange(t.dataset.change); return; }
-  if (t.dataset.doc) { openDoc(t.dataset.doc, "#reader"); return; }
-  if (t.dataset.docDetail) { showDetail(`<button class="ibtn close" data-close>✕</button><div id="dd"></div>`); openDoc(t.dataset.docDetail, "#dd"); return; }
+  if (t.dataset.doc) { if (leaveOk()) openDoc(t.dataset.doc, "#reader"); return; }
+  if (t.dataset.docDetail) { if (!leaveOk()) return; showDetail(`<button class="ibtn close" data-close>✕</button><div id="dd"></div>`); openDoc(t.dataset.docDetail, "#dd"); return; }
   if (t.dataset.img !== undefined && t.dataset.img) { const p = t.dataset.img; showDetail(`<button class="ibtn close" data-close>✕</button><h3>${esc(p.split("/").pop())}</h3><img src="${raw(p)}" style="max-width:100%;border-radius:8px" alt=""><p><a class="btn" href="${blob(p)}" target="_blank" rel="noopener">在 GitHub 打開</a> <a class="btn" href="${raw(p)}" download>下載</a></p><p class="muted">${esc(p)}</p>`); return; }
-  if (t.dataset.close !== undefined) { hideDetail(); return; }
+  if (t.dataset.close !== undefined) { if ($("#detail #edText") && !leaveOk()) return; hideDetail(); return; }
   if (t.dataset.tree) { document.querySelectorAll("#flowTree li").forEach(li => li.classList.toggle("closed", t.dataset.tree === "close" && li.parentElement.id !== "flowTree")); return; }
   if (t.dataset.proj) { switchProject(t.dataset.proj); return; }
   if (t.dataset.af) { S.assetFilter = t.dataset.af; loadAssetSheet((S.data.content || []).find(f => f.ext === "csv" && /素材|asset/i.test(f.name)).path); return; }
@@ -345,11 +352,24 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("input", e => { if (e.target.id === "treeSearch") { S.treeFilter = e.target.value; const pos = e.target.selectionStart; $("#view").innerHTML = V.tree(); const i = $("#treeSearch"); i.focus(); i.setSelectionRange(pos, pos); } });
 addEventListener("popstate", () => { const p = new URLSearchParams(location.search).get("repo"); if (p && p !== S.repo) switchProject(p, false); else go(location.hash.slice(1) || "overview", false); });
-addEventListener("keydown", e => { if (e.key === "Escape") hideDetail(); });
+// Esc 關明細：打字中、對話框開著、明細裡有編輯器時都不關
+addEventListener("keydown", e => { if (e.key === "Escape" && !$("#dlg").open && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) && !$("#detail #edText")) hideDetail(); });
 addEventListener("hashchange", () => { const r = location.hash.slice(1); if (r && r !== [S.view, S.arg].filter(Boolean).join("/")) go(r, false); });
 $("#menu").addEventListener("click", () => document.body.classList.toggle("drawer"));
 $("#scrim").addEventListener("click", () => document.body.classList.remove("drawer"));
-$("#projBtn").addEventListener("click", () => go("projects"));
+// 左上角專案下拉選單：直接切換專案
+function closeProjMenu() { $("#projMenu")?.remove(); $("#projBtn").setAttribute("aria-expanded", "false"); }
+$("#projBtn").addEventListener("click", e => {
+  e.stopPropagation();
+  if ($("#projMenu")) return closeProjMenu();
+  const m = document.createElement("div");
+  m.id = "projMenu"; m.className = "menu"; m.setAttribute("role", "menu");
+  m.innerHTML = S.projects.map(p => `<button role="menuitem" data-proj="${esc(p.repo)}" ${p.repo === S.repo ? 'aria-current="true"' : ""}><b>${p.repo === S.repo ? "✓ " : ""}${esc(p.name || p.repo)}</b><small>${esc(p.repo)}</small></button>`).join("") + `<hr><button role="menuitem" data-go="projects">📁 專案目錄（看全部、加入專案）</button>`;
+  $("#projBtn").after(m); $("#projBtn").setAttribute("aria-expanded", "true");
+  m.style.left = Math.min($("#projBtn").offsetLeft, innerWidth - m.offsetWidth - 8) + "px";
+});
+document.addEventListener("click", e => { if (!e.target.closest("#projMenu,#projBtn")) closeProjMenu(); });
+addEventListener("keydown", e => { if (e.key === "Escape") closeProjMenu(); });
 $("#reload").addEventListener("click", () => load(S.repo));
 $("#theme").addEventListener("click", () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); const nx = cur === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = nx; store.set("console:theme", nx); });
 if (store.get("console:theme")) document.documentElement.dataset.theme = store.get("console:theme");
@@ -357,11 +377,23 @@ if (store.get("console:theme")) document.documentElement.dataset.theme = store.g
 // ---------- 登入與寫入 ----------
 const canWrite = () => !!auth.user?.canWrite;
 const canTriage = () => !!auth.user?.canTriage;
+// 所有寫入對話框最上面都寫清楚「送到哪個專案」，避免選錯專案
+const target = () => `<div class="banner">📁 送到專案：<b>${esc(S.data?.name || S.repo)}</b>（${esc(S.repo)}）　不對的話請先按左上角換專案</div>`;
+// 已同意、但 GitHub Actions 還沒寫回的申請單（重新整理後也記得，避免重複同意）
+const pendKey = () => `console:pending:${S.repo}`;
+const pending = () => { try { const p = JSON.parse(sessionStorage.getItem(pendKey()) || "{}"); for (const k in p) if (Date.now() - p[k] > 10 * 60000) delete p[k]; return p; } catch { return {}; } };
+const markPending = id => { try { sessionStorage.setItem(pendKey(), JSON.stringify({ ...pending(), [id]: Date.now() })); } catch {} };
+const isPending = c => c.status === "待同意" && !!pending()[c.id];
+const approveBtn = (c, label = "👍 同意") => isPending(c) ? `<span class="chip s-已同意">⏳ 已同意，系統寫入中</span>` : `<button class="btn ok" data-approve="${esc(c.id)}">${label}</button>`;
+// 編輯中還沒存：離開前要確認
+const leaveOk = () => !S.dirty || confirm("文件還沒儲存，確定要離開嗎？改的內容會不見。") && !(S.dirty = false);
+addEventListener("beforeunload", e => { if (S.dirty) { e.preventDefault(); e.returnValue = ""; } });
 function toast(msg, ms = 3500) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), ms); }
 /** 對話框：回傳按下的按鈕 value（取消＝""） */
 function dialog(title, body, buttons = [["", "取消"], ["ok", "確定", "primary"]]) {
   const d = $("#dlg");
-  d.innerHTML = `<form method="dialog"><div class="dlg-h">${esc(title)}<span class="spacer"></span><button class="ibtn" value="" aria-label="關閉">✕</button></div><div class="dlg-b">${body}</div><div class="dlg-f">${buttons.map(([v, l, c]) => `<button class="btn ${c || ""}" value="${v}">${l}</button>`).join("")}</div></form>`;
+  // 取消／關閉加 formnovalidate：必填欄位還沒填也要能關掉
+  d.innerHTML = `<form method="dialog"><div class="dlg-h">${esc(title)}<span class="spacer"></span><button class="ibtn" value="" formnovalidate aria-label="關閉">✕</button></div><div class="dlg-b">${body}</div><div class="dlg-f">${buttons.map(([v, l, c]) => `<button class="btn ${c || ""}" value="${v}" ${v ? "" : "formnovalidate"}>${l}</button>`).join("")}</div></form>`;
   d.showModal();
   // 用 submit（按按鈕當下就觸發）而不是 close 事件：背景分頁裡 close 事件可能會延遲
   return new Promise(res => {
@@ -372,7 +404,7 @@ function dialog(title, body, buttons = [["", "取消"], ["ok", "確定", "primar
 }
 function renderAuth() {
   const b = $("#loginBtn");
-  if (auth.user) { b.innerHTML = `<span class="who"><img src="${esc(auth.user.avatar)}" alt="">${esc(auth.user.login)}${auth.user.canWrite ? "" : " 👀"}</span>`; b.title = auth.user.canWrite ? "已登入：可以同意、留言、寫回饋、編輯內容" : "已登入，但對這個專案只有讀取權限"; }
+  if (auth.user) { b.innerHTML = `<span class="who"><img src="${esc(auth.user.avatar)}" alt="">${esc(auth.user.login)}${auth.user.noAccess ? " 🔒" : auth.user.canWrite ? "" : " 👀"}</span>`; b.title = auth.user.noAccess ? "已登入，但登入碼沒有包含這個專案" : auth.user.canWrite ? "已登入：可以同意、留言、寫回饋、編輯內容" : "已登入，但對這個專案只有讀取權限"; }
   else { b.textContent = "🔑 登入"; b.title = "登入後可以在管理台直接同意、留言、寫回饋、編輯內容"; }
 }
 async function checkAuth() {
@@ -382,7 +414,7 @@ async function checkAuth() {
 }
 async function loginFlow() {
   if (auth.user) {
-    const v = await dialog("帳號", `<p><span class="who"><img src="${esc(auth.user.avatar)}" alt=""><b>${esc(auth.user.name)}</b>（${esc(auth.user.login)}）</span></p><p>對「${esc(S.repo)}」的權限：${auth.user.canWrite ? "✅ 可以同意、留言、寫回饋、編輯內容" : auth.user.canTriage ? "可以同意、留言、寫回饋（不能編輯內容）" : "👀 只能看"}</p><p class="muted">登入碼存在這台瀏覽器。換電腦、共用電腦用完請登出。</p>`, [["", "關閉"], ["out", "登出", "primary"]]);
+    const v = await dialog("帳號", `<p><span class="who"><img src="${esc(auth.user.avatar)}" alt=""><b>${esc(auth.user.name)}</b>（${esc(auth.user.login)}）</span></p><p>對「${esc(S.repo)}」的權限：${auth.user.noAccess ? `🔒 登入碼沒有包含這個專案。請<a href="${tokenUrl(S.repo.split("/")[0])}" target="_blank" rel="noopener">重新產生登入碼</a>並勾選它（或選 All repositories），再登出、重新登入。` : auth.user.canWrite ? "✅ 可以同意、留言、寫回饋、編輯內容" : auth.user.canTriage ? "可以同意、留言、寫回饋（不能編輯內容）" : "👀 只能看"}</p><p class="muted">登入碼存在這台瀏覽器。換電腦、共用電腦用完請登出。</p>`, [["", "關閉"], ["out", "登出", "primary"]]);
     if (v === "out") { auth.clear(); renderAuth(); render(); toast("已登出"); }
     return;
   }
@@ -409,14 +441,17 @@ $("#loginBtn").addEventListener("click", loginFlow);
 
 async function doApprove(id) {
   const c = S.data.changes.find(x => x.id === id); if (!c) return;
-  const v = await dialog("同意申請單", `<p>確定同意 <b>${esc(c.title)}</b>（${esc(c.id)}）？</p>${c.confirm ? `<div class="ask">❓ ${esc(c.confirm)}</div>` : ""}<p class="muted">同意後 AI 就可以開始實作。如果還有疑問，請改用「留言」。</p>`, [["", "取消"], ["ok", "👍 同意", "ok"]]);
+  const v = await dialog("同意申請單", `${target()}<p>確定同意 <b>${esc(c.title)}</b>（${esc(c.id)}）？</p>${c.confirm ? `<div class="ask">❓ ${esc(c.confirm)}</div>` : ""}<p class="muted">同意後 AI 就可以開始實作。如果還有疑問，請改用「留言」。</p>`, [["", "取消"], ["ok", "👍 同意", "ok"]]);
   if (v !== "ok") return;
-  try { const how = await approveChange(S.repo, c, S.data.specDir, S.data.branch); toast(how === "issue" ? "已同意 ✅ 約 1 分鐘後任務 0.1 會自動打勾" : "已同意 ✅ 已寫入任務 0.1"); c.tasks.approved = true; c.status = "已同意"; c.tasks.approvalNote = `企劃於管理台同意（${auth.user.login}）`; render(); }
-  catch (e) { toast("同意失敗：" + e.message, 7000); }
+  try {
+    const how = await approveChange(S.repo, c, S.data.specDir, S.data.branch);
+    toast(how === "already" ? "這張已經同意過了，系統寫入中 ⏳" : how === "issue" ? "已同意 ✅ 約 1 分鐘後任務 0.1 會自動打勾" : "已同意 ✅ 已寫入任務 0.1");
+    markPending(c.id); render();
+  } catch (e) { toast("同意失敗：" + e.message, 7000); }
 }
 async function doComment(id) {
   const c = S.data.changes.find(x => x.id === id); if (!c?.issue) return;
-  const v = await dialog(`留言：${c.title}`, `<label class="fld"><span>想說什麼（問題、要修改的地方都可以）</span><textarea name="msg" required placeholder="例：拖尾顏色跟著街區配色，手機上請再短一點"></textarea></label><p class="muted">留言會出現在申請單 Issue；對 AI 說「看申請單」，AI 會照留言修改。</p>`, [["", "取消"], ["ok", "送出留言", "primary"]]);
+  const v = await dialog(`留言：${c.title}`, `${target()}<label class="fld"><span>想說什麼（問題、要修改的地方都可以）</span><textarea name="msg" required placeholder="例：拖尾顏色跟著街區配色，手機上請再短一點"></textarea></label><p class="muted">留言會出現在申請單 Issue；對 AI 說「看申請單」，AI 會照留言修改。</p>`, [["", "取消"], ["ok", "送出留言", "primary"]]);
   if (v !== "ok") return;
   const msg = $("#dlg form").msg.value.trim(); if (!msg) return;
   try { await comment(S.repo, c.issue.number, msg); c.issue.comments = (c.issue.comments || 0) + 1; toast("已送出留言 💬"); render(); }
@@ -424,7 +459,7 @@ async function doComment(id) {
 }
 async function doNewIssue(kind) {
   const fb = kind === "回饋";
-  const v = await dialog(fb ? "🎮 寫回饋" : "💡 提需求", `
+  const v = await dialog(fb ? "🎮 寫回饋" : "💡 提需求", `${target()}
     <label class="fld"><span>${fb ? "一句話說是什麼問題" : "一句話說想要什麼"}</span><input name="title" required placeholder="${fb ? "例：第 5 關球常常卡在右上角" : "例：加一個每日挑戰關卡"}"></label>
     ${fb ? `<label class="fld"><span>等級</span><select name="level"><option>🔴 必修（不改不行）</option><option selected>🟡 建議（改了會更好）</option><option>🟢 很好（請保留不要動）</option></select></label>
       <label class="fld"><span>試玩的版本或日期</span><input name="version" placeholder="v3.7.3 或 10/6"></label>
@@ -442,20 +477,21 @@ async function doNewIssue(kind) {
   if (!fields.__title) return;
   toast("送出中…", 20000);
   try {
-    const i = await createIssue(S.repo, kind, fields, [...(f.shots.files || [])], S.data.branch);
+    const i = await createIssue(S.repo, kind, fields, [...(f.shots.files || [])], S.data.branch, (S.data.contentDirs || ["docs/企劃"])[0]);
     (fb ? S.data.feedback : S.data.requests).unshift({ number: i.number, title: i.title, url: i.html_url, state: "open", created: i.created_at, user: auth.user.login, labels: [kind], comments: 0 });
     toast(`已送出 #${i.number} ✅`); render();
   } catch (e) { toast("送出失敗：" + e.message, 7000); }
 }
 
-async function doEdit(path, preset) {
-  const el = $("#reader") || $("#dd"); if (!el) return;
+async function doEdit(path, preset, container) {
+  const el = container || $("#reader") || $("#dd"); if (!el) return;
   el.innerHTML = `<div class="muted">讀取中…</div>`;
   let file = preset;
   if (!file) try { file = await readFile(S.repo, path, S.data.branch); } catch (e) { el.innerHTML = `<div class="card err">${esc(e.message)}</div>`; return; }
   const mirror = /正本在 Obsidian|鏡像自 Obsidian/.test(file.text);
   el.innerHTML = `<div class="editor">
     <div class="row" style="margin-bottom:10px"><b style="flex:1">✏️ ${esc(path)}</b><button class="btn" data-ed="preview">預覽</button><button class="btn" data-ed="cancel">取消</button><button class="btn primary" data-ed="save">儲存</button></div>
+    ${target()}
     ${mirror ? `<div class="banner">這份的正本在 Obsidian，兩邊雙向同步：在這裡儲存後，下次「同步企劃文件」會寫回 Obsidian（兩邊都改過會提醒，不會互相蓋掉）。</div>` : ""}
     <textarea id="edText" spellcheck="false">${esc(file.text)}</textarea>
     <div class="md doc" id="edPrev" hidden></div>
@@ -466,35 +502,45 @@ async function doEdit(path, preset) {
     p.hidden = showing; ta.hidden = !showing;
     el.querySelector('[data-ed="preview"]').textContent = showing ? "預覽" : "回到編輯";
   };
-  el.querySelector('[data-ed="cancel"]').onclick = () => openDoc(path, el);
-  el.querySelector('[data-ed="save"]').onclick = async () => {
+  el.querySelector("#edText").addEventListener("input", e => { S.dirty = e.target.value !== file.text; });
+  el.querySelector('[data-ed="cancel"]').onclick = () => { if (leaveOk()) { S.dirty = false; openDoc(path, el); } };
+  const saveBtn = el.querySelector('[data-ed="save"]');
+  saveBtn.onclick = async () => {
     const text = $("#edText").value, msg = $("#edMsg").value.trim() || `更新 ${path.split("/").pop()}`;
     if (text === file.text) { toast("沒有改動"); return; }
-    try { const sha = await saveFile(S.repo, path, text, `內容：${msg}（管理台，${auth.user.login}）`, file.sha, S.data.branch); file = { text, sha }; toast("已儲存 ✅ GitHub 上的檔案已更新"); S.docCache = { path, text, sha }; openDoc(path, el); }
-    catch (e) { toast("儲存失敗：" + e.message, 7000); }
+    saveBtn.disabled = true; saveBtn.textContent = "儲存中…"; // 防止連按兩次
+    try { const sha = await saveFile(S.repo, path, text, `內容：${msg}（管理台，${auth.user.login}）`, file.sha, S.data.branch); file = { text, sha }; S.dirty = false; remember(path, text); toast("已儲存 ✅ GitHub 上的檔案已更新"); openDoc(path, el); }
+    catch (e) { toast("儲存失敗：" + e.message, 7000); saveBtn.disabled = false; saveBtn.textContent = "儲存"; }
   };
 }
 async function doNewDoc(catKey) {
   const cat = CATS.find(c => c.key === catKey);
   const files = (S.data.content || []).filter(f => catOf(f) === catKey);
   const folder = files[0] ? files[0].path.split("/").slice(0, -1).join("/") : `${(S.data.contentDirs || ["docs/企劃"])[0]}/知識庫/${cat?.label || "其他"}`;
-  const v = await dialog(`＋ 新增${cat?.label || ""}文件`, `<label class="fld"><span>標題（也是檔名）</span><input name="title" required placeholder="例：${catKey === "chars" ? "新角色－小黑" : "第 2 區劇情"}"></label><p class="muted">會建立在 <code>${esc(folder)}/</code></p>`, [["", "取消"], ["ok", "建立", "primary"]]);
+  const v = await dialog(`＋ 新增${cat?.label || ""}文件`, `${target()}<label class="fld"><span>標題（也是檔名）</span><input name="title" required placeholder="例：${catKey === "chars" ? "新角色－小黑" : "第 2 區劇情"}"></label><p class="muted">會建立在 <code>${esc(folder)}/</code></p>`, [["", "取消"], ["ok", "建立", "primary"]]);
   if (v !== "ok") return;
   const title = $("#dlg form").title.value.trim().replace(/[\\/:*?"<>|]/g, "－"); if (!title) return;
   const path = `${folder}/${title}.md`;
   const text = `# ${title}\n\n`;
-  try { const sha = await saveFile(S.repo, path, text, `內容：新增 ${title}（管理台，${auth.user.login}）`, undefined, S.data.branch); S.data.content.push({ path, name: title + ".md", ext: "md", size: 0, title }); S.doc = path; S.docCache = { path, text }; render(); setTimeout(() => doEdit(path, { text, sha }), 50); toast("已建立，開始編輯吧"); }
+  if ((S.data.content || []).some(f => f.path === path)) { toast("已經有同名的文件了，請換一個標題", 6000); return; }
+  try { const sha = await saveFile(S.repo, path, text, `內容：新增 ${title}（管理台，${auth.user.login}）`, undefined, S.data.branch); S.data.content.push({ path, name: title + ".md", ext: "md", size: 0, title }); S.doc = path; remember(path, text); render(); setTimeout(() => doEdit(path, { text, sha }), 50); toast("已建立，開始編輯吧"); }
   catch (e) { toast("建立失敗：" + e.message, 7000); }
 }
 async function doUpload() {
   const dir = `${(S.data.contentDirs || ["docs/企劃"])[0]}/圖`;
-  const v = await dialog("＋ 上傳素材", `<label class="fld"><span>選擇檔案（圖片或聲音，可以多個）</span><input name="files" type="file" accept="image/*,audio/*" multiple required></label><p class="muted">會放到 <code>${esc(dir)}/</code>。檔名請用英文小寫＋底線（例：<code>fish_sleepy.png</code>）。</p>`, [["", "取消"], ["ok", "上傳", "primary"]]);
+  const v = await dialog("＋ 上傳素材", `${target()}<label class="fld"><span>選擇檔案（圖片或聲音，可以多個）</span><input name="files" type="file" accept="image/*,audio/*" multiple required></label><p class="muted">會放到 <code>${esc(dir)}/</code>。檔名請用英文小寫＋底線（例：<code>fish_sleepy.png</code>）。</p>`, [["", "取消"], ["ok", "上傳", "primary"]]);
   if (v !== "ok") return;
   const files = [...($("#dlg form").files.files || [])]; if (!files.length) return;
   toast("上傳中…", 30000);
   try {
-    for (const file of files) { const path = `${dir}/${file.name}`; await uploadFile(S.repo, path, file, `素材：上傳 ${file.name}（管理台，${auth.user.login}）`, S.data.branch); S.data.content.push({ path, name: file.name, ext: file.name.split(".").pop().toLowerCase(), size: file.size, title: file.name.replace(/\.[^.]+$/, "") }); }
-    toast(`已上傳 ${files.length} 個檔案 ✅`); render();
+    const renamed = [];
+    for (const file of files) {
+      const r = await uploadFile(S.repo, `${dir}/${file.name}`, file, `素材：上傳 ${file.name}（管理台，${auth.user.login}）`, S.data.branch);
+      const name = r.path.split("/").pop();
+      if (name !== file.name) renamed.push(`${file.name} → ${name}`);
+      S.data.content.push({ path: r.path, name, ext: name.split(".").pop().toLowerCase(), size: file.size, title: name.replace(/\.[^.]+$/, "") });
+    }
+    toast(`已上傳 ${files.length} 個檔案 ✅${renamed.length ? `（同名已自動改名：${renamed.join("、")}）` : ""}`, renamed.length ? 8000 : 3500); render();
   } catch (e) { toast("上傳失敗：" + e.message, 7000); }
 }
 document.addEventListener("click", e => {
@@ -502,10 +548,11 @@ document.addEventListener("click", e => {
   if (!t) return;
   e.preventDefault();
   if (!auth.user) { loginFlow(); return; }
+  if (!canTriage()) { toast(auth.user.noAccess ? `你的登入碼沒有包含「${S.repo}」：請重新產生登入碼並勾選這個專案` : "你對這個專案只有讀取權限", 7000); return; }
   if (t.dataset.approve) doApprove(t.dataset.approve);
   else if (t.dataset.comment) doComment(t.dataset.comment);
   else if (t.dataset.newissue) doNewIssue(t.dataset.newissue);
-  else if (t.dataset.edit) { if (!canWrite()) return toast("你對這個專案沒有編輯權限"); doEdit(t.dataset.edit); }
+  else if (t.dataset.edit) { if (!canWrite()) return toast("你對這個專案沒有編輯權限"); doEdit(t.dataset.edit, null, t.closest("#reader,#dd")); }
   else if (t.dataset.newdoc) { if (!canWrite()) return toast("你對這個專案沒有編輯權限"); doNewDoc(t.dataset.newdoc); }
   else if (t.dataset.upload !== undefined) { if (!canWrite()) return toast("你對這個專案沒有編輯權限"); doUpload(); }
 });
@@ -535,11 +582,12 @@ function setData(d, cached) {
   $("#toWorkbench").href = `../workbench/?repo=${encodeURIComponent(S.repo)}`;
   store.set("console:last", S.repo);
   go(location.hash.slice(1) || "overview", false);
-  if (auth.token && auth.user?.repo !== S.repo) checkAuth().then(() => { if (auth.user) auth.user.repo = S.repo; });
+  if (auth.token && auth.user?.repo !== S.repo) checkAuth();
 }
 function switchProject(repo, push = true) {
-  S.sel = ""; S.doc = ""; hideDetail();
-  if (push) history.pushState(null, "", `${location.pathname}?repo=${encodeURIComponent(repo)}#overview`);
+  if (!leaveOk()) return;
+  S.sel = ""; S.doc = ""; hideDetail(); closeProjMenu();
+  if (push) history.pushState(null, "", urlFor(repo, "overview"));
   load(repo);
 }
 async function loadProjectSums() {

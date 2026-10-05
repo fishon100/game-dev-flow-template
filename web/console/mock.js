@@ -14,7 +14,7 @@ window.fetch = async (url, init = {}) => {
   window.__calls.push({ method, path, body });
   if (path === "/user") return json({ login: "demo-planner", name: "示範企劃", avatar_url: "../workbench/icon.svg" });
   let m;
-  if ((m = path.match(/^\/repos\/[^/]+\/[^/]+$/))) return json({ permissions: { push: true, triage: true } });
+  if ((m = path.match(/^\/repos\/([^/]+\/[^/]+)$/))) return (window.__noAccess || []).includes(m[1]) ? json({ message: "Not Found" }, 404) : json({ permissions: { push: true, triage: true } });
   if ((m = path.match(/\/issues\/(\d+)$/)) && method === "GET") return json({ number: +m[1], body: "<!-- spectra-change: x -->\n### 為什麼\n…\n\n- [ ] 企劃同意\n" });
   if (path.match(/\/issues\/\d+$/) && method === "PATCH") return json({ ok: true });
   if (path.match(/\/issues\/\d+\/comments$/)) return json({ id: 1 }, 201);
@@ -24,7 +24,13 @@ window.fetch = async (url, init = {}) => {
       const r = await real(`https://raw.githubusercontent.com/${m[1]}/main/${m[2].split("/").map(encodeURIComponent).join("/")}`);
       return r.ok ? json({ content: b64(await r.text()), sha: "mock-sha" }) : json({ message: "Not Found" }, 404);
     }
-    if (method === "PUT") return json({ content: { sha: "mock-sha-2" } }, 201);
+    if (method === "PUT") {
+      // 跟 GitHub 一樣：檔案已存在又沒給 sha → 422
+      window.__files = window.__files || new Set();
+      if (!body.sha && window.__files.has(m[2])) return json({ message: 'Invalid request.\n\n"sha" wasn\'t supplied.' }, 422);
+      window.__files.add(m[2]);
+      return json({ content: { sha: "mock-sha-2" } }, 201);
+    }
   }
   return json({ message: "mock: 沒有處理 " + method + " " + path }, 404);
 };
