@@ -1,0 +1,67 @@
+# 推上 main → 跑測試 → 部署到 GitHub Pages → 手機通知（成功或失敗都會通知）
+# 第一次用：Settings → Pages → Source 選「GitHub Actions」；（選用）Secrets 加 NTFY_TOPIC
+name: test-and-deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 自動測試
+        run: node --test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  notify:
+    needs: [test, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 手機通知（ntfy）
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          OK: ${{ needs.deploy.result == 'success' }}
+          MSG: ${{ github.event.head_commit.message }}
+          SITE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$NTFY_TOPIC" ]; then echo "沒有設定 NTFY_TOPIC，略過通知"; exit 0; fi
+          FIRST_LINE=$(printf '%s' "$MSG" | head -n 1)
+          if [ "$OK" = "true" ]; then
+            curl -s -H "Title: 遊戲已更新" -H "Tags: video_game" -H "Click: $SITE" \
+              -H "Actions: view, 開啟遊戲, $SITE; view, 測試頁, ${SITE}test.html" \
+              -d "$FIRST_LINE" "https://ntfy.sh/$NTFY_TOPIC"
+          else
+            curl -s -H "Title: 部署失敗" -H "Tags: x" -H "Priority: high" -H "Click: $RUN" \
+              -d "$FIRST_LINE（測試沒過或部署失敗，點開看原因）" "https://ntfy.sh/$NTFY_TOPIC"
+          fi
