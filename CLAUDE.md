@@ -84,5 +84,6 @@ Changes can be parked（暫存）— temporarily moved out of `docs/spectra/chan
 | 本機通知 | `powershell -ExecutionPolicy Bypass -File tools\notify.ps1 -Title "標題" -Message "內容"` |
 
 ## 注意
+- 改了 `web/console/` 的 JS：把 `index.html` 與 `app.js` 裡的 `?v=` 改成新的時間（例 `?v=202610061200`），使用者才不會吃到舊的快取
 - Windows PowerShell 5.1 執行含中文的 `.ps1` 需要 UTF-8 BOM
 - 公開 repo：不寫密鑰、本機路徑、個人 email

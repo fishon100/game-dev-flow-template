@@ -1,7 +1,7 @@
 // 開發管理台：多專案、流程樹、申請單、規則書、內容庫（劇本／角色／世界觀…）、素材庫、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js?v=202610060126";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -398,8 +398,16 @@ function dialog(title, body, buttons = [["", "取消"], ["ok", "確定", "primar
   // 用 submit（按按鈕當下就觸發）而不是 close 事件：背景分頁裡 close 事件可能會延遲
   return new Promise(res => {
     const form = d.querySelector("form");
-    form.addEventListener("submit", e => res(e.submitter?.value || ""), { once: true });
-    d.addEventListener("cancel", () => res(""), { once: true });
+    const done = v => { d.onclick = null; res(v); };
+    form.addEventListener("submit", e => done(e.submitter?.value || ""), { once: true });
+    d.addEventListener("cancel", () => done(""), { once: true });
+    // 點視窗外面的暗色區域也能關；已經填了東西就先確認，免得不小心按到
+    d.onclick = e => {
+      if (e.target !== d) return;
+      const filled = [...form.querySelectorAll("input:not([type=checkbox]),textarea")].some(i => i.type === "file" ? i.files.length : i.value.trim());
+      if (filled && !confirm("填的內容還沒送出，確定要關閉嗎？")) return;
+      d.close(); done("");
+    };
   });
 }
 function renderAuth() {
@@ -602,7 +610,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610060126"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}
