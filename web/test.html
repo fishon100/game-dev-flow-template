@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>測試頁</title>
+  <style>
+    body { margin: 0; padding: 16px; background: #0b0a12; color: #e8f6ff; font: 15px/1.6 system-ui, sans-serif; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    p { margin: 0 0 16px; opacity: .75; }
+    li { list-style: none; padding: 6px 0; border-bottom: 1px solid #ffffff1a; }
+    .ok::before { content: "✅ "; } .fail::before { content: "❌ "; } .fail { color: #ff8a8a; }
+    #sum { font-weight: bold; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>瀏覽器測試</h1>
+  <p>規則測試在 GitHub Actions 跑（<code>node --test</code>）；這頁只測需要畫面的東西。</p>
+  <ul id="list"></ul>
+  <div id="sum"></div>
+  <!-- 受測遊戲要真的顯示出來：藏起來的 iframe 瀏覽器不會幫它畫圖 -->
+  <iframe id="game" src="index.html" width="180" height="320" style="border:1px solid #ffffff33;margin-top:16px" title="受測遊戲"></iframe>
+  <script type="module">
+    // 需要畫面的測試寫在這裡：每個 check 對應規則書一個情境
+    const checks = [
+      ["遊戲畫面載入並畫出東西", async (win) => {
+        const c = win.document.getElementById("game");
+        const px = c.getContext("2d").getImageData(c.width / 2, c.height - 50, 1, 1).data;
+        if (!c.width || px[3] === 0) throw new Error("畫布是空的");
+      }],
+      ["小螢幕也不會出現橫向捲動", async (win) => {
+        if (win.document.documentElement.scrollWidth > win.innerWidth + 1) throw new Error("出現橫向捲動");
+      }],
+    ];
+    const list = document.getElementById("list"), frame = document.getElementById("game");
+    await new Promise(r => frame.addEventListener("load", r, { once: true }));
+    for (let t = 0; t < 50 && !frame.contentWindow.gameReady; t++) await new Promise(r => setTimeout(r, 100));
+    let pass = 0;
+    for (const [name, fn] of checks) {
+      const li = document.createElement("li");
+      try { await fn(frame.contentWindow); li.className = "ok"; li.textContent = name; pass++; }
+      catch (e) { li.className = "fail"; li.textContent = `${name}：${e.message}`; }
+      list.append(li);
+    }
+    document.getElementById("sum").textContent = `${pass}/${checks.length} 通過`;
+  </script>
+</body>
+</html>

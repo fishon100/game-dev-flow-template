@@ -1,0 +1,7 @@
+{
+  "_說明": "手感數值只寫在這裡（單一來源）。改完說「套用調參」，AI 會同步 Notion 數值總表並重跑測試。",
+  "board": { "width": 360, "height": 640 },
+  "ball": { "radius": 10, "gravity": 900, "max_speed": 1400, "wall_bounce": 0.9, "launch_speed": 620 },
+  "paddle": { "width": 96, "height": 14, "y_from_bottom": 56, "bounce_speed": 760, "max_angle_deg": 60 },
+  "rules": { "start_lives": 3 }
+}
