@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseTasks, approveTasks, parseProposal, statusOf, readSpectra, approvalIssueBody, ISSUE_MARKER_RE, ISSUE_APPROVE_RE } from "../tools/workbench/lib.mjs";
+import { parseTasks, approveTasks, parseProposal, statusOf, readSpectra, approvalIssueBody, indexContent, ISSUE_MARKER_RE, ISSUE_APPROVE_RE } from "../tools/workbench/lib.mjs";
 
 const TASKS = `## 0. 企劃確認
 
@@ -62,7 +62,9 @@ test("讀資料夾：進行中、已結案（日期與代號分開）、規則�
   writeFileSync(join(S, "specs/catch-ball/spec.md"), "## Purpose\n\nx\n\n> 中文：接球遊戲\n\n## Requirements\n\n### Requirement: A\n\n#### Scenario: a\n\n#### Scenario: b\n");
   const { changes, specs } = readSpectra(root);
   assert.deepEqual(changes.map(c => [c.id, c.status, c.date]), [["paddle-wide", "待同意", ""], ["old-one", "已結案", "2026-10-05"]]);
-  assert.deepEqual(specs, [{ name: "catch-ball", purpose: "接球遊戲", requirements: 1, scenarios: 2 }]);
+  assert.deepEqual(specs.map(s => [s.name, s.purpose, s.requirements, s.scenarios]), [["catch-ball", "接球遊戲", 1, 2]]);
+  assert.deepEqual(specs[0].reqs, [{ name: "A", zh: "", scenarios: ["a", "b"] }]);
+  assert.deepEqual(changes[0].artifacts, { proposal: true, specs: false, design: false, tasks: true });
 });
 
 test("Issue 內文：帶標記與可勾選的「企劃同意」，勾選後能被辨認", () => {
@@ -70,4 +72,20 @@ test("Issue 內文：帶標記與可勾選的「企劃同意」，勾選後能�
   assert.equal(body.match(ISSUE_MARKER_RE)[1], "paddle-wide");
   assert.equal(body.match(ISSUE_APPROVE_RE)[1], " ");
   assert.equal(body.replace("- [ ] 企劃同意", "- [x] 企劃同意").match(ISSUE_APPROVE_RE)[1], "x");
+});
+
+test("流程樹：任務依「## 標題」分組", () => {
+  const t = parseTasks(TASKS);
+  assert.deepEqual(t.groups.map(g => [g.title, g.items.length]), [["0. 企劃確認", 1], ["1. 測試", 2]]);
+  assert.equal(t.groups[1].items[0].done, true);
+});
+
+test("內容庫：列出文件與圖檔，Markdown 用第一個標題當名稱", () => {
+  const root = mkdtempSync(join(tmpdir(), "wb-"));
+  mkdirSync(join(root, "docs/企劃/知識庫/角色"), { recursive: true });
+  writeFileSync(join(root, "docs/企劃/知識庫/角色/阿鰭.md"), "---\ntags: [x]\n---\n# 阿鰭（角色卡）\n內容");
+  writeFileSync(join(root, "docs/企劃/圖.png"), "x");
+  writeFileSync(join(root, "docs/企劃/略過.tmp"), "x");
+  const idx = indexContent(root);
+  assert.deepEqual(idx.map(f => [f.path, f.ext, f.title]), [["docs/企劃/圖.png", "png", "圖"], ["docs/企劃/知識庫/角色/阿鰭.md", "md", "阿鰭（角色卡）"]]);
 });

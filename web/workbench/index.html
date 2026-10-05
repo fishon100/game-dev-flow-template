@@ -95,6 +95,7 @@ code { background: var(--brand-soft); padding: 1px 6px; border-radius: 6px; font
   <div class="wrap">
     <h1 id="proj">開發工作台</h1>
     <span class="fresh" id="fresh"></span>
+    <a class="iconbtn" id="toConsole" title="電腦版管理台" aria-label="電腦版管理台" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none" target="_blank" rel="noopener">💻</a>
     <button class="iconbtn" id="reload" title="重新整理" aria-label="重新整理">⟳</button>
   </div>
   <div class="wrap" style="padding-bottom:0">
@@ -322,6 +323,7 @@ code { background: var(--brand-soft); padding: 1px 6px; border-radius: 6px; font
     } finally { $("#reload").disabled = false; }
   }
   $("#reload").addEventListener("click", load);
+  $("#toConsole").href = `../console/?repo=${encodeURIComponent(repo)}`;
   addEventListener("hashchange", () => { const t = location.hash.slice(1); if (tabs.some(b => b.dataset.tab === t)) show(t); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && window.__data && Date.now() - new Date(window.__data.generatedAt) > 60000) load(); });
   load();

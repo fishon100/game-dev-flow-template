@@ -3,8 +3,20 @@
   "name": "範例遊戲（接球）",
   "spec_dir": "docs/spectra",
   "links": [
-    { "label": "▶ 試玩", "url": "https://fishon100.github.io/game-dev-flow-template/" },
-    { "label": "🧪 測試頁", "url": "https://fishon100.github.io/game-dev-flow-template/test.html" },
-    { "label": "📘 開發流說明", "url": "https://github.com/fishon100/game-dev-flow-template/tree/main/docs/flow" }
+    {
+      "label": "▶ 試玩",
+      "url": "https://fishon100.github.io/game-dev-flow-template/"
+    },
+    {
+      "label": "🧪 測試頁",
+      "url": "https://fishon100.github.io/game-dev-flow-template/test.html"
+    },
+    {
+      "label": "📘 開發流說明",
+      "url": "https://github.com/fishon100/game-dev-flow-template/tree/main/docs/flow"
+    }
+  ],
+  "content_dirs": [
+    "docs/企劃"
   ]
 }

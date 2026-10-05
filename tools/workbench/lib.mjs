@@ -25,7 +25,15 @@ export function parseTasks(md) {
   const approvalItem = items.find(t => /^0\.1 /.test(t.text));
   const work = items.filter(t => t !== approvalItem);
   const note = approvalItem?.done ? (approvalItem.text.match(/（([^）]*同意[^）]*)）\s*$/) || [])[1] || "" : "";
+  const groups = [];
+  for (const line of md.split("\n")) {
+    const h = line.match(/^##\s+(.+)/);
+    if (h) groups.push({ title: h[1].trim(), items: [] });
+    const m = line.match(/^- \[( |x|X)\] (.*)$/);
+    if (m) { if (!groups.length) groups.push({ title: "任務", items: [] }); groups.at(-1).items.push({ done: m[1] !== " ", text: m[2].trim() }); }
+  }
   return {
+    groups: groups.filter(g => g.items.length),
     total: work.length,
     done: work.filter(t => t.done).length,
     hasApprovalItem: !!approvalItem,
@@ -78,7 +86,8 @@ export function readSpectra(root, specDir = "docs/spectra") {
     const capabilities = dirs(join(dir, "specs"));
     const date = archived ? (name.match(/^\d{4}-\d{2}-\d{2}/) || [""])[0] : "";
     const id = archived ? name.replace(/^\d{4}-\d{2}-\d{2}-/, "") : name;
-    return { id, folder: name, archived, date, ...proposal, capabilities, tasks, status: statusOf({ archived, tasks }) };
+    const artifacts = { proposal: existsSync(join(dir, "proposal.md")), specs: capabilities.length > 0, design: existsSync(join(dir, "design.md")), tasks: existsSync(join(dir, "tasks.md")) };
+    return { id, folder: name, archived, date, ...proposal, capabilities, artifacts, tasks, status: statusOf({ archived, tasks }) };
   };
   const changesDir = join(base, "changes");
   const active = dirs(changesDir).filter(n => n !== "archive").map(n => change(join(changesDir, n), n, false));
@@ -87,7 +96,12 @@ export function readSpectra(root, specDir = "docs/spectra") {
     const md = read(join(base, "specs", name, "spec.md"));
     const purposeZh = (md.match(/## Purpose[\s\S]*?> 中文[：:]\s*(.+)/) || [])[1] || "";
     const purpose = purposeZh || (sections(md).Purpose || "").split("\n")[0];
-    return { name, purpose, requirements: (md.match(/^### Requirement:/gm) || []).length, scenarios: (md.match(/^#### Scenario:/gm) || []).length };
+    const reqs = ("\n" + md).split(/\n(?=### Requirement:)/).slice(1).map(block => ({
+      name: block.match(/^### Requirement:\s*(.+)/)[1].trim(),
+      zh: (block.match(/> 中文[：:]\s*(.+)/) || [])[1] || "",
+      scenarios: [...block.matchAll(/^#### Scenario:\s*(.+)$/gm)].map(m => m[1].trim()),
+    }));
+    return { name, purpose, requirements: reqs.length, scenarios: reqs.reduce((n, r) => n + r.scenarios.length, 0), reqs };
   });
   return { changes: [...active, ...archived], specs };
 }
@@ -114,4 +128,25 @@ export function approvalIssueBody(c, repoUrl, specDir = "docs/spectra") {
     `有意見？直接在下面留言，AI 會照意見修改申請單。`,
     `完整內容：${link}`,
   ].filter(l => l !== "").join("\n").replace(/\n(### )/g, "\n\n$1");
+}
+
+/** 內容庫索引：列出 dirs 底下的文件與圖檔（給管理台的內容庫、素材庫用；內容由管理台按需讀取） */
+export function indexContent(root, dirs = ["docs/企劃"]) {
+  const keep = /\.(md|csv|png|jpe?g|gif|webp|svg|mp3|ogg|wav|json)$/i;
+  const out = [];
+  const walk = (abs, rel) => {
+    if (!existsSync(abs)) return;
+    for (const n of readdirSync(abs)) {
+      if (n.startsWith(".")) continue;
+      const a = join(abs, n), r = rel + "/" + n, st = statSync(a);
+      if (st.isDirectory()) walk(a, r);
+      else if (keep.test(n)) {
+        const ext = n.split(".").pop().toLowerCase();
+        const title = ext === "md" ? ((read(a).match(/^# (.+)$/m) || [])[1] || n.replace(/\.md$/, "")).trim() : n.replace(/\.[^.]+$/, "");
+        out.push({ path: r.replace(/^\//, ""), name: n, ext, size: st.size, title });
+      }
+    }
+  };
+  for (const d of dirs) walk(join(root, d), d);
+  return out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }

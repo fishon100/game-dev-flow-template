@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { readSpectra, approveTasks, approvalIssueBody, ISSUE_MARKER_RE, ISSUE_APPROVE_RE } from "./lib.mjs";
+import { readSpectra, approveTasks, approvalIssueBody, indexContent, ISSUE_MARKER_RE, ISSUE_APPROVE_RE } from "./lib.mjs";
 
 const root = process.cwd();
 const repo = process.env.GITHUB_REPOSITORY;
@@ -108,6 +108,9 @@ const { specs } = readSpectra(root, specDir);
 const data = {
   generatedAt: new Date().toISOString(),
   repo, repoUrl, specDir,
+  branch: process.env.GITHUB_REF_NAME && !process.env.GITHUB_REF_NAME.includes("/") ? process.env.GITHUB_REF_NAME : "main",
+  contentDirs: cfg.content_dirs || ["docs/企劃"],
+  content: indexContent(root, cfg.content_dirs || ["docs/企劃"]),
   name: cfg.name || repo.split("/")[1],
   links: cfg.links || [],
   changes, specs,
