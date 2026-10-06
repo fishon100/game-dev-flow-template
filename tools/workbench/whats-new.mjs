@@ -1,10 +1,10 @@
 // 「同步」：企劃回到對話時，AI 先跑這支，把企劃在管理台（或 GitHub、手機）做過、等 AI 接手的事列出來。
 // 用法：git pull 之後 node tools/workbench/whats-new.mjs
-// 讀：提案狀態（docs/spectra）、GitHub 討論串（gh）、管理台送來的修改（git log）、關卡編輯器的修改檔（有的專案才有）
+// 讀：提案狀態（docs/spectra）、GitHub 討論串（gh）、試玩清單、素材清單、管理台送來的修改（git log）、關卡編輯器的修改檔（有的專案才有）
 import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { readSpectra, ISSUE_MARKER_RE } from "./lib.mjs";
+import { readSpectra, ISSUE_MARKER_RE, QA_MARKER_RE, parseQa, assetSummary, indexContent } from "./lib.mjs";
 
 const root = process.cwd();
 const cfg = existsSync("workbench.config.json") ? JSON.parse(readFileSync("workbench.config.json", "utf8")) : {};
@@ -23,8 +23,24 @@ section("等企劃同意的提案", by("待同意").filter(c => c.kind !== "技�
 section("等程式同意的技術提案", by("待同意").filter(c => c.kind === "技術").map(c => `${c.title}（${c.id}）`));
 section("已同意、還沒開始做（可以直接做到上線）", by("已同意").map(c => { todo.push(`做 ${c.id}`); return `${tag(c)}${c.title}（${c.id}）・${c.tasks.approvalNote || "已同意"}`; }));
 section("製作中", by("製作中").map(c => { todo.push(`繼續做 ${c.id}`); return `${tag(c)}${c.title}（${c.id}）・任務 ${c.tasks.done}/${c.tasks.total}・下一步：${c.tasks.next}`; }));
-section("做完了，等企劃試玩驗收", by("待驗收").filter(c => c.kind !== "技術").map(c => `${c.title}（${c.id}）→ 試玩後說「${c.id} 驗收通過」`));
-section("技術提案做完了，等程式確認", by("待驗收").filter(c => c.kind === "技術").map(c => `${c.title}（${c.id}）→ PR 合併、測試通過後說「${c.id} 驗收通過」`));
+// 試玩清單（GitHub 討論串，標籤「試玩」）：進度、不通過的項目
+const qaIssues = json("gh issue list --label 試玩 --state open --limit 50 --json number,body,url") || [];
+const qaOf = c => { const i = qaIssues.find(x => (x.body || "").match(QA_MARKER_RE)?.[1] === c.id); return i && { number: i.number, ...parseQa(i.body) }; };
+const qaLine = c => { const q = qaOf(c); if (!q) return "試玩清單還沒建立（推上去約 1 分鐘後會自動開）"; const bad = q.items.filter(i => !i.done && i.fails.length);
+  bad.forEach(i => todo.push(`修試玩不通過：${c.id}「${i.text}」（回饋 ${i.fails.map(n => "#" + n).join("、")}）`));
+  return `試玩清單 #${q.number}：${q.done}/${q.total}${bad.length ? `，不通過：${bad.map(i => `「${i.text}」${i.fails.map(n => "#" + n).join("、")}`).join("；")}` : q.done === q.total ? "，全部通過 → 可以問企劃要不要驗收" : ""}`; };
+section("做完了，等試玩驗收", by("待驗收").filter(c => c.kind !== "技術").map(c => `${c.title}（${c.id}）・${qaLine(c)}`));
+section("技術提案做完了，等程式確認", by("待驗收").filter(c => c.kind === "技術").map(c => `${c.title}（${c.id}）・${qaLine(c)}・PR 合併、測試通過後說「${c.id} 驗收通過」`));
+
+// 素材清單（檔名有「素材」的 CSV）：美術交件了等企劃確認；企劃採用了要放進遊戲
+const sheet = indexContent(root, cfg.content_dirs || ["docs/企劃"]).find(f => f.ext === "csv" && /素材|asset/i.test(f.name));
+if (sheet) {
+  const a = assetSummary(readFileSync(join(root, sheet.path), "utf8"));
+  section("美術交件了，等企劃確認（素材庫按採用／退回，或在對話中說）", a.toReview);
+  section("企劃採用了，要放進遊戲（放好後清單狀態改「已放進遊戲」）", a.toPlace);
+  if (a.toReview.length) todo.push(`請企劃確認 ${a.toReview.length} 個素材`);
+  if (a.toPlace.length) todo.push(`把 ${a.toPlace.length} 個已採用的素材放進遊戲`);
+}
 
 // 2. GitHub 討論串：提案的新留言（最後一則是人留的）、還沒處理的回饋與需求
 const issues = json("gh issue list --state open --limit 100 --json number,title,labels,body,url") || [];

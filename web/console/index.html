@@ -136,7 +136,35 @@ button.chip { cursor: pointer; } button.chip:hover { filter: brightness(.97); }
 .s-製作中 { background: var(--accent-soft); color: var(--accent); }
 .s-待驗收 { background: var(--violet-soft); color: var(--violet); }
 .s-已完成 { background: var(--ok-soft); color: var(--ok); }
-.c-bad { background: var(--bad-soft); color: var(--bad); } .c-ok { background: var(--ok-soft); color: var(--ok); } .c-warn { background: var(--warn-soft); color: var(--warn); }
+.c-bad { background: var(--bad-soft); color: var(--bad); } .c-ok { background: var(--ok-soft); color: var(--ok); } .c-warn { background: var(--warn-soft); color: var(--warn); } .c-info { background: var(--info-soft); color: var(--info); }
+/* 試玩清單 */
+.qa { border: 1px solid var(--line); border-radius: var(--r); margin: 4px 0 18px; overflow: hidden; }
+.qa.all { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.qa-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; background: var(--canvas); border-bottom: 1px solid var(--line); }
+.qa-h .ico { color: var(--accent); }
+.qa-list { list-style: none; margin: 0; padding: 0; }
+.qa-list li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.qa-list li:last-child { border-bottom: 0; }
+.qa-list li .g { flex: 1; min-width: 0; line-height: 1.5; }
+.qa-list li.ok .g > div:first-child { color: var(--sub); }
+.qa-list li.bad { background: color-mix(in srgb, var(--bad-soft) 60%, transparent); }
+.qa-ck { border: 0; background: none; padding: 2px; cursor: pointer; color: var(--faint); border-radius: 50%; }
+.qa-ck[aria-pressed="true"] { color: var(--ok); }
+.qa-ck:hover { color: var(--accent); }
+.qa > p { margin: 0; padding: 10px 12px; border-top: 1px solid var(--line); }
+.bad-t { color: var(--bad); font-weight: 600; } .ok-t { color: var(--ok); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+/* 素材確認 */
+.flowline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0 0 10px; }
+.flowline span:not(.sep) { font-weight: 600; color: var(--ink); }
+.flowline .sep { color: var(--line-strong); }
+table.assets td.sent { min-width: 140px; }
+table.assets td.acts { white-space: nowrap; }
+table.assets td.acts .btn + .btn { margin-left: 4px; }
+.thumb { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 0; width: 44px; height: 44px; overflow: hidden; cursor: zoom-in; margin: 0 4px 4px 0; }
+.thumb img, .thumbs img { width: 100%; height: 100%; object-fit: contain; }
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.thumbs img { aspect-ratio: 1; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.note { font-size: 12.5px; color: var(--sub); display: flex; gap: 4px; align-items: flex-start; }
 .bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; min-width: 70px; }
 .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
 .btn { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; }
@@ -384,6 +412,6 @@ dialog::backdrop { background: rgb(10 10 20 / .45); }
 </div>
 <dialog id="dlg"></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=202610071500"></script>
+<script type="module" src="app.js?v=202610071900"></script>
 </body>
 </html>

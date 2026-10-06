@@ -223,7 +223,7 @@ button.btn { font: inherit; cursor: pointer; }
         <li><span class="chip s-待同意">待同意</span> AI 寫好提案，等企劃看過同意（<span class="chip c-tech">技術</span> 提案由程式同意，做完開 PR 給程式審查）</li>
         <li><span class="chip s-已同意">已同意</span> 可以開始做了：對 AI 說「做 xxx」</li>
         <li><span class="chip s-製作中">製作中</span> AI 正在照任務清單做，進度條是完成的任務數</li>
-        <li><span class="chip s-待驗收">待驗收</span> 任務都做完、已上線：請試玩，沒問題就說「xxx 驗收通過」</li>
+        <li><span class="chip s-待驗收">待驗收</span> 任務都做完、已上線：照<b>試玩清單</b>一項一項試（GitHub App 可以直接勾），沒問題就說「xxx 驗收通過」</li>
         <li><span class="chip s-已完成">已完成</span> 規則已併回規則書</li>
       </ul>
     </section>
@@ -232,7 +232,7 @@ button.btn { font: inherit; cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { icon as I } from "../console/icons.js?v=202610062100";
+import { icon as I } from "../console/icons.js?v=202610071900";
 (() => {
   const qs = new URLSearchParams(location.search);
   // 看哪個 repo：網址 ?repo=帳號/名稱 優先；再來是上次看的（加到主畫面後開啟時網址沒有 ?repo）；最後從 <帳號>.github.io/<repo>/ 推算
@@ -259,8 +259,11 @@ import { icon as I } from "../console/icons.js?v=202610062100";
   function toast(msg, ms = 4500) { const el = $("#toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("show"), ms); }
 
   // ---- 角色（和管理台共用設定 console:role）----
-  const ROLES = [["企劃", "fileText"], ["美術", "image"], ["程式", "code"], ["劇本／數值", "book"], ["全部", "users"]];
-  const ROLE_TAG = { 企劃: /【企劃】/, 美術: /【美術】/, 程式: /【程式】/, "劇本／數值": /【(劇本|數值)】/ };
+  const ROLES = [["企劃", "fileText"], ["美術", "image"], ["程式", "code"], ["QA", "flask"], ["劇本／數值", "book"], ["全部", "users"]];
+  const ROLE_TAG = { 企劃: /【企劃】/, 美術: /【美術】/, 程式: /【程式】/, QA: /【QA】/i, "劇本／數值": /【(劇本|數值)】/ };
+  // 試玩清單進度（GitHub 討論串：手機 App 可以直接勾）
+  const qaText = c => c.qa ? `試玩清單 ${c.qa.done}/${c.qa.total}${c.qa.failed ? `・${c.qa.failed} 項不通過` : c.qa.total && c.qa.done === c.qa.total ? "・全部通過" : ""}` : "試玩清單建立中（約 1 分鐘）";
+  const clip = (s, n) => { s = String(s || ""); return s.length > n ? s.slice(0, n) + "…" : s; };
   let role = store.get("console:role") || "";
   let assetTodo = null; // 素材清單（素材.csv）裡「待製作／修改」的數量，給美術的待辦
   async function loadAssetTodo(d) {
@@ -337,11 +340,13 @@ import { icon as I } from "../console/icons.js?v=202610062100";
     // 首頁：我的待辦（依角色；跟管理台同一套規則）
     const r = role || "全部", is = (...x) => r === "全部" || x.includes(r);
     const todo = [], item = (title, sub, action = "") => todo.push(`<div class="item"><div class="grow"><b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</div>${action}</div>`);
+    const consoleUrl = route => `../console/?repo=${encodeURIComponent(d.repo)}#${route}`;
     const hbtn = (href, label) => `<a class="btn hbtn" href="${esc(href)}" target="_blank" rel="noopener">${label}</a>`;
     const hsay = text => `<button class="btn hbtn" data-say="${esc(text)}" title="複製這句話，貼到 Claude">${I("message", 14)}複製指令</button>`;
     if (is("企劃")) {
       waiting.filter(c => c.kind !== "技術").forEach(c => item(esc(c.title), "等你同意", c.issue ? hbtn(c.issue.url, "看內容並同意") : ""));
-      toClose.filter(c => c.kind !== "技術").forEach(c => item(esc(c.title), `做完了：試玩後對 AI 說「${esc(c.id)} 驗收通過」`, hsay(`${c.id} 驗收通過`)));
+      toClose.filter(c => c.kind !== "技術").forEach(c => item(esc(c.title), `做完了・${esc(qaText(c))}：試完對 AI 說「${esc(c.id)} 驗收通過」`, (c.qa ? hbtn(c.qa.url, "試玩清單") : "") + hsay(`${c.id} 驗收通過`)));
+      if (d.assets?.toReview?.length) item(`${d.assets.toReview.length} 個素材等你確認`, `美術交件了：${esc(clip(d.assets.toReview.join("、"), 50))}`, hbtn(consoleUrl("assets/待確認"), "確認素材"));
       if (fbOpen.length + rqOpen.length) item(`${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, `對 AI 說「${fbOpen.length ? "看回饋" : "看需求"}」整理成提案`, hsay(fbOpen.length ? "看回饋" : "看需求"));
     }
     if (is("程式")) {
@@ -351,8 +356,15 @@ import { icon as I } from "../console/icons.js?v=202610062100";
       if (lastRun && lastRun.conclusion === "failure") item(`最近一次「${esc(lastRun.name)}」失敗`, esc(lastRun.title || ""), hbtn(lastRun.url, "看原因"));
       active.filter(c => c.status === "已同意").forEach(c => item(esc(c.title), `${c.kind === "技術" ? "程式" : "企劃"}已同意：對 AI 說「做 ${esc(c.id)}」`, hsay(`做 ${c.id}`)));
     }
-    for (const x of ["企劃", "美術", "程式", "劇本／數值"]) if (is(x)) for (const c of active) for (const g of c.tasks.groups || []) for (const it of g.items) if (!it.done && ROLE_TAG[x].test(it.text)) item(esc(it.text), `提案：${esc(c.title)}`);
-    if (is("美術")) { if (!assetTodo) loadAssetTodo(d); else if (assetTodo.n) item(`${assetTodo.n} 個素材待製作或要修改`, "素材清單（素材.csv），在電腦版管理台的素材庫看細節"); }
+    if (is("QA")) toClose.forEach(c => item(`試玩：${esc(c.title)}`, esc(qaText(c)), c.qa ? hbtn(c.qa.url, "打開清單") : ""));
+    for (const x of ["企劃", "美術", "程式", "QA", "劇本／數值"]) if (is(x)) for (const c of active) for (const g of c.tasks.groups || []) for (const it of g.items) if (!it.done && ROLE_TAG[x].test(it.text)) item(esc(it.text), `提案：${esc(c.title)}`);
+    if (is("美術")) {
+      if (d.assets) {
+        if (d.assets.returned.length) item(`${d.assets.returned.length} 個素材被退回，要修改`, esc(clip(d.assets.returned.join("、"), 50)), hbtn(consoleUrl("assets/退回"), "看意見"));
+        const make = d.assets.toMake.length - d.assets.returned.length;
+        if (make > 0) item(`${make} 個素材待製作`, "做好後在管理台素材庫按「交件」", hbtn(consoleUrl("assets"), "素材庫"));
+      } else if (!assetTodo) loadAssetTodo(d); else if (assetTodo.n) item(`${assetTodo.n} 個素材待製作或要修改`, "素材清單（素材.csv），在電腦版管理台的素材庫看細節");
+    }
     [...fbOpen, ...rqOpen].filter(i => r !== "全部" && r.split("／").some(x => i.labels?.includes(x))).forEach(i => item(`#${i.number} ${esc(i.title)}`, `標籤：${esc(r)}`, hbtn(i.url, "查看")));
     $("#todo").innerHTML = `<div class="row"><span class="num">${todo.length}</span><span>${r === "全部" ? "件事需要處理" : `件${esc(r)}的待辦`}</span></div>` +
       (todo.length ? todo.join("") : `<div>${r === "全部" || r === "企劃" ? "目前沒有等你的事。可以去試玩最新版本，或丟新想法到需求。" : `目前沒有${esc(r)}的待辦。提案任務標了【${esc(r.split("／")[0])}】就會出現在這裡。`}</div>`);

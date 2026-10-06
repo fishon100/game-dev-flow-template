@@ -68,6 +68,78 @@ export function parseProposal(md, fallbackName) {
     breaking: /\*\*BREAKING\*\*/.test(md),
     // 類型：企劃（改玩法、規則書，企劃同意）／技術（重構、效能、工具，不改規則書，程式同意、要程式審查）
     kind: /類型[：:]\s*技術/.test(md) ? "技術" : "企劃",
+    // 試玩重點：給試玩的人（QA／企劃）一項一項確認的事
+    qaFocus: pick(/試玩重點/).split("\n").map(l => l.match(/^\s*[-*]\s+(.+)/)?.[1]?.trim()).filter(Boolean),
+  };
+}
+
+/** 提案的規則差異（changes/<id>/specs/<能力>/spec.md）：每條規則的名稱、中文說明；移除的規則不算 */
+export function parseDeltaReqs(md, cap = "") {
+  const out = []; let op = "ADDED";
+  for (const line of md.split("\n")) {
+    const h = line.match(/^## (ADDED|MODIFIED|REMOVED|RENAMED) Requirements/i); if (h) { op = h[1].toUpperCase(); continue; }
+    const r = line.match(/^### Requirement:\s*(.+)/); if (r) { out.push({ cap, op, name: r[1].trim(), zh: "" }); continue; }
+    const z = line.match(/^> 中文[：:]\s*(.+)/); if (z && out.length && !out.at(-1).zh) out.at(-1).zh = z[1].trim();
+  }
+  return out.filter(r => r.op !== "REMOVED");
+}
+
+// ---------- 試玩清單（QA）：提案做完、上線後，給人一項一項試玩的清單（GitHub 討論串，手機 App 也能勾） ----------
+export const QA_MARKER = id => `<!-- spectra-qa: ${id} -->`;
+export const QA_MARKER_RE = /<!-- spectra-qa: ([a-z0-9][a-z0-9-]*) -->/;
+export const QA_ALWAYS = ["在手機上從頭玩到這次改的地方，沒有卡頓、跑版或錯字"];
+/** 清單項目：提案的「試玩重點」優先，沒有就用每條規則的中文說明；最後加上每次都要試的（workbench.config.json 的 qa_always） */
+export function qaItems(c, always = QA_ALWAYS) {
+  const own = c.qaFocus?.length ? c.qaFocus : (c.reqs || []).map(r => r.zh || r.name);
+  const items = [...new Set([...own, ...always])];
+  return items.length ? items : [...QA_ALWAYS];
+}
+export function qaIssueBody(c, items, repoUrl, specDir = "docs/spectra", playUrl = "") {
+  return [
+    QA_MARKER(c.id),
+    `提案「${c.title}」做完、已經上線了。請照下面一項一項試玩：**沒問題就勾**；有問題在管理台按「不通過」（會自動開一則 🔴 回饋），或在下面留言寫哪一項、怎麼了（附截圖更好）。`,
+    playUrl ? `\n▶ 試玩：${playUrl}` : "",
+    `\n### 試玩清單\n`,
+    ...items.map(t => `- [ ] ${t}`),
+    `\n---`,
+    `全部勾完後，對 AI 說「${c.id} 驗收通過」。`,
+    `提案內容：${repoUrl}/tree/main/${specDir}/changes/${c.folder}`,
+  ].filter(l => l !== "").join("\n");
+}
+/** 讀回試玩清單：每項有沒有勾、不通過的回饋編號（❌ 還沒修、✅ 修好了） */
+export function parseQa(body = "") {
+  const items = [...body.matchAll(/^- \[( |x|X)\] (.*)$/gm)].map(m => {
+    const done = m[1] !== " ", fails = [...m[2].matchAll(/[❌✅] #(\d+)/g)].map(x => +x[1]);
+    return { done, text: m[2].replace(/\s*[❌✅] #\d+/g, "").trim(), fails, fixed: done && fails.length > 0 };
+  });
+  return { items, total: items.length, done: items.filter(i => i.done).length, failed: items.filter(i => !i.done && i.fails.length).length };
+}
+
+// ---------- 素材清單（素材.csv）：美術做 → 交件（待確認）→ 企劃採用／退回 → AI 放進遊戲 ----------
+function parseCsvRows(text) {
+  text = text.replace(/^﻿/, ""); const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"') q = true; else if (ch === ",") { row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+/** 依狀態分：美術要做的（含退回）、企劃要確認的、已採用還沒放進遊戲的 */
+export function assetSummary(csvText) {
+  const rows = parseCsvRows(csvText), head = rows[0] || [];
+  const iS = head.indexOf("狀態"), iN = Math.max(0, head.indexOf("檔名"));
+  const body = rows.slice(1).filter(r => r.some(Boolean) && iS >= 0 && r[iS]);
+  const names = test => body.filter(r => test(r[iS].trim())).map(r => r[iN]);
+  const finished = s => /^(待確認|已採用|已放進遊戲|完成|已完成)$/.test(s);
+  return {
+    toMake: names(s => !finished(s)),
+    toReview: names(s => s === "待確認"),
+    toPlace: names(s => s === "已採用"),
+    returned: names(s => /退回|修改|重做/.test(s)),
   };
 }
 
@@ -88,10 +160,11 @@ export function readSpectra(root, specDir = "docs/spectra") {
     const tasks = parseTasks(read(join(dir, "tasks.md")));
     const proposal = parseProposal(read(join(dir, "proposal.md")), name);
     const capabilities = dirs(join(dir, "specs"));
+    const reqs = capabilities.flatMap(cap => parseDeltaReqs(read(join(dir, "specs", cap, "spec.md")), cap));
     const date = archived ? (name.match(/^\d{4}-\d{2}-\d{2}/) || [""])[0] : "";
     const id = archived ? name.replace(/^\d{4}-\d{2}-\d{2}-/, "") : name;
     const artifacts = { proposal: existsSync(join(dir, "proposal.md")), specs: capabilities.length > 0, design: existsSync(join(dir, "design.md")), tasks: existsSync(join(dir, "tasks.md")) };
-    return { id, folder: name, archived, date, ...proposal, capabilities, artifacts, tasks, status: statusOf({ archived, tasks }) };
+    return { id, folder: name, archived, date, ...proposal, capabilities, reqs, artifacts, tasks, status: statusOf({ archived, tasks }) };
   };
   const changesDir = join(base, "changes");
   const active = dirs(changesDir).filter(n => n !== "archive").map(n => change(join(changesDir, n), n, false));

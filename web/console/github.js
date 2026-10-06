@@ -1,5 +1,6 @@
 // 管理台的 GitHub 寫入：登入（登入碼）、同意、留言、開回饋／需求、上傳檔案、編輯內容
 // 登入碼只存在這台瀏覽器（localStorage，或勾「只在這次」時存 sessionStorage），只會送到 api.github.com。
+import { setQaItem, failQaItem, updateAssetRow } from "./shared.js?v=202610071900";
 const KEY = "console:auth";
 const API = "https://api.github.com";
 
@@ -49,7 +50,8 @@ export const classicTokenUrl = "https://github.com/settings/tokens/new?scopes=re
 
 // ---- UTF-8 與 base64 ----
 const b64encode = str => { const bytes = new TextEncoder().encode(str); let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
-const b64decode = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, "")), c => c.charCodeAt(0)));
+// ignoreBOM：保留檔案開頭的 BOM（Excel 開 CSV 靠它認中文；預設會被吃掉，存回去就變亂碼）
+const b64decode = b64 => new TextDecoder("utf-8", { ignoreBOM: true }).decode(Uint8Array.from(atob(b64.replace(/\s/g, "")), c => c.charCodeAt(0)));
 const bufToB64 = buf => { const bytes = new Uint8Array(buf); let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
 const encPath = p => p.split("/").map(encodeURIComponent).join("/");
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
@@ -97,6 +99,28 @@ export async function approveChange(repo, change, specDir, branch) {
   const next = text.replace(TASK_RE, line => /^- \[[xX]\]/.test(line) ? line : line.replace(/^- \[ \]/, "- [x]").replace(/\s*$/, `（${role}於管理台同意（${who}），${today()}）`));
   await saveFile(repo, path, next, `${role}同意：${change.id}（管理台，${who}）`, sha, branch);
   return "tasks";
+}
+
+/** 試玩清單：勾／取消第 i 項（讀最新內容再改，不會蓋掉別人剛勾的） */
+export async function qaSet(repo, number, i, done) {
+  const issue = await gh(`/repos/${repo}/issues/${number}`);
+  const body = setQaItem(issue.body || "", i, done);
+  if (body !== issue.body) await gh(`/repos/${repo}/issues/${number}`, { method: "PATCH", body: { body } });
+  return body;
+}
+/** 試玩清單：第 i 項不通過，標上回饋編號 */
+export async function qaFail(repo, number, i, feedbackNumber) {
+  const issue = await gh(`/repos/${repo}/issues/${number}`);
+  const body = failQaItem(issue.body || "", i, feedbackNumber);
+  await gh(`/repos/${repo}/issues/${number}`, { method: "PATCH", body: { body } });
+  return body;
+}
+/** 素材清單：改某一列（狀態、交件、意見），讀最新的再改；回傳新的內容 */
+export async function saveAssetRow(repo, path, rowIndex, name, changes, message, branch = "main") {
+  const { text, sha } = await readFile(repo, path, branch);
+  const next = updateAssetRow(text, rowIndex, name, changes);
+  const newSha = await saveFile(repo, path, next, message, sha, branch);
+  return { text: next, sha: newSha };
 }
 
 export const comment = (repo, number, text) => gh(`/repos/${repo}/issues/${number}/comments`, { method: "POST", body: { body: text } });

@@ -1,14 +1,17 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js?v=202610071500";
-import { icon as I, hasIcon } from "./icons.js?v=202610071500";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow } from "./github.js?v=202610071900";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610071900";
+import { icon as I, hasIcon } from "./icons.js?v=202610071900";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 const qs = new URLSearchParams(location.search);
 const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000); if (m < 1) return "剛剛"; if (m < 60) return `${m} 分鐘前`; const h = Math.round(m / 60); return h < 24 ? `${h} 小時前` : `${Math.round(h / 24)} 天前`; };
 const short = (s, n) => { s = String(s || "").replace(/[#*`>_]/g, "").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
+// 檔名用：只截長度，不像 short() 會拿掉 _ * 這些 Markdown 符號
+const clip = (s, n) => { s = String(s || ""); return s.length > n ? s.slice(0, n) + "…" : s; };
 const encPath = p => p.split("/").map(encodeURIComponent).join("/");
 
 const S = { projects: [], repo: "", data: null, view: "overview", arg: "", treeFilter: "", flowMode: store.get("console:flowMode") || "diagram", assetFilter: "全部", assetCat: "全部" };
@@ -86,6 +89,21 @@ function chainHtml(c) {
 const taskTree = (groups, closedDone) => (groups || []).map(g => `<li class="${closedDone && g.items.every(i => i.done) ? "closed" : ""}"><div class="tnode"><button class="tw">${I("chevronDown", 14)}</button><span class="lbl"><b>${esc(g.title)}</b></span><span class="meta muted">${g.items.filter(i => i.done).length}/${g.items.length}</span></div>
   <ul>${g.items.map(i => `<li><div class="tnode"><span class="tw leaf"></span><span class="${i.done ? "ck" : "ck-no"}">${I(i.done ? "checkCircle" : "circle", 15)}</span><span class="lbl" title="${esc(i.text)}">${esc(i.text)}</span></div></li>`).join("")}</ul></li>`).join("");
 
+// 試玩清單：做完、已上線的提案，一項一項試玩（勾＝沒問題；不通過＝自動開 🔴 回饋）
+function qaHtml(c) {
+  if (c.archived || !(c.qa || c.status === "待驗收")) return "";
+  if (!c.qa) return `<div class="banner">${I("hourglass", 15)}<span>試玩清單建立中：約 1 分鐘後重新整理就會出現。</span></div>`;
+  const q = c.qa, all = q.total && q.done === q.total;
+  const fbLink = n => `<a href="${esc(S.data.repoUrl)}/issues/${n}" target="_blank" rel="noopener">#${n}</a>`;
+  return `<section class="qa ${all ? "all" : ""}">
+    <div class="qa-h">${I("flask", 15)}<b>試玩清單</b><span class="muted">${q.done}/${q.total}${q.failed ? `・<span class="bad-t">${q.failed} 項不通過</span>` : ""}</span><span class="spacer"></span>${playLinks(S.data).slice(0, 1).map(l => `<a class="btn sm primary" href="${esc(l.url)}" target="_blank" rel="noopener">${I("play", 13)}試玩</a>`).join("")}<a class="btn sm" href="${esc(q.url)}" target="_blank" rel="noopener" title="GitHub 上的試玩清單（手機 App 也能勾）">${I("git", 13)}#${q.number}</a></div>
+    <ul class="qa-list">${q.items.map((it, i) => `<li class="${it.done ? "ok" : it.fails.length ? "bad" : ""}">
+      <button class="qa-ck" data-qa="${esc(c.id)}:${i}:${it.done ? 0 : 1}" aria-pressed="${it.done}" title="${it.done ? "取消勾選" : "沒問題，勾起來"}">${I(it.done ? "checkCircle" : "circle", 18)}</button>
+      <div class="g"><div>${esc(it.text)}</div>${it.fails.length ? `<div class="muted">${it.fixed ? "修好了" : "不通過"}：${it.fails.map(fbLink).join("、")}</div>` : ""}</div>
+      ${it.done ? "" : `<button class="btn sm" data-qafail="${esc(c.id)}:${i}">${I("x", 13)}不通過</button>`}</li>`).join("")}</ul>
+    ${all ? `<p class="ok-t">${I("checkCircle", 14)}全部通過：企劃確認後對 AI 說「${esc(c.id)} 驗收通過」。</p>` : `<p class="muted">沒問題就勾；有問題按「不通過」，寫下哪裡怪（可附截圖），會自動開一則 🔴 必修回饋，AI 修好後再試一次。</p>`}
+  </section>`;
+}
 function changeDetail(c) {
   const folder = `${S.data.specDir}/changes/${c.archived ? "archive/" : ""}${c.folder}`;
   const groups = taskTree(c.tasks.groups, true);
@@ -101,6 +119,7 @@ function changeDetail(c) {
       ${c.issue ? `<a class="btn" href="${esc(c.issue.url)}" target="_blank" rel="noopener" title="GitHub 上的討論串（Issue）">${I("git")}討論串 #${c.issue.number}${c.issue.comments ? `（${c.issue.comments}）` : ""}</a>` : ""}
     </div>
     ${c.tasks.approvalNote ? `<div class="banner">${I("checkCircle")}<span>${esc(c.tasks.approvalNote)}</span></div>` : ""}
+    ${qaHtml(c)}
     <h3>為什麼</h3><div class="pre">${esc(c.why || "（沒有寫）")}</div>
     <h3 style="margin-top:16px">改什麼</h3><div class="pre">${esc(c.what || "（沒有寫）")}</div>
     ${c.confirm ? `<h3 style="margin-top:16px">${I("help", 14)}需要企劃確認的事</h3><div class="ask">${esc(c.confirm)}</div>` : ""}
@@ -142,8 +161,10 @@ V.overview = () => {
     </div>`;
 };
 // ===== 角色與「我的待辦」：首頁依角色列出要做的事 =====
-const ROLES = [["企劃", "fileText", "同意提案、試玩驗收、處理回饋"], ["美術", "image", "標【美術】的任務、待製作的素材"], ["程式", "code", "審查 PR、叫 AI 製作已同意的提案、修失敗的測試"], ["劇本／數值", "book", "標【劇本】【數值】的任務"], ["全部", "users", "看所有要處理的事"]];
-const ROLE_TAG = { 企劃: /【企劃】/, 美術: /【美術】/, 程式: /【程式】/, "劇本／數值": /【(劇本|數值)】/ };
+const ROLES = [["企劃", "fileText", "同意提案、確認素材、驗收、處理回饋"], ["美術", "image", "標【美術】的任務、待製作與被退回的素材、交件"], ["程式", "code", "同意技術提案、審查 PR、修失敗的測試"], ["QA", "flask", "照試玩清單試玩、回報不通過"], ["劇本／數值", "book", "標【劇本】【數值】的任務"], ["全部", "users", "看所有要處理的事"]];
+const ROLE_TAG = { 企劃: /【企劃】/, 美術: /【美術】/, 程式: /【程式】/, QA: /【QA】/i, "劇本／數值": /【(劇本|數值)】/ };
+// 試玩清單進度（給待辦、流程圖、明細用）
+const qaText = c => c.qa ? `試玩清單 ${c.qa.done}/${c.qa.total}${c.qa.failed ? `・${c.qa.failed} 項不通過` : c.qa.total && c.qa.done === c.qa.total ? "・全部通過" : ""}` : c.status === "待驗收" ? "試玩清單建立中（約 1 分鐘）" : "";
 S.role = store.get("console:role") || "";
 const rolePicker = () => `<section class="panel role-pick"><div class="ph">${I("users", 15)}<h3>你主要負責什麼？</h3><span class="spacer"></span><span class="muted">首頁會依角色列出你的待辦（之後可以在「需要處理」右上角換）</span></div><div class="pb"><div class="roles">${ROLES.map(([r, ic, desc]) => `<button class="role" data-role="${esc(r)}">${I(ic, 18)}<b>${esc(r)}</b><small>${esc(desc)}</small></button>`).join("")}</div></div></section>`;
 const roleSelect = () => `<select class="rsel" data-rolesel aria-label="角色">${ROLES.map(([r]) => `<option ${r === (S.role || "全部") ? "selected" : ""}>${esc(r)}</option>`).join("")}</select>`;
@@ -164,7 +185,9 @@ function myTodo(role) {
   const is = (...r) => role === "全部" || r.includes(role);
   if (is("企劃")) {
     by("待同意").filter(c => c.kind !== "技術").forEach(c => add("ap:" + c.id, todoLi("", esc(c.title), `等企劃同意・${esc(c.id)}`, approveBtn(c, `${I("thumbsUp", 14)}同意`) + detailBtn(c))));
-    by("待驗收").filter(c => c.kind !== "技術").forEach(c => add("vf:" + c.id, todoLi("info", esc(c.title), "做完了：請試玩，沒問題就跟 AI 說驗收通過", sayBtn(`${c.id} 驗收通過`) + detailBtn(c))));
+    by("待驗收").filter(c => c.kind !== "技術").forEach(c => add("vf:" + c.id, todoLi(c.qa?.failed ? "bad" : "info", esc(c.title), `做完了：照試玩清單試玩，沒問題就跟 AI 說驗收通過・${esc(qaText(c))}`, sayBtn(`${c.id} 驗收通過`) + `<button class="btn sm" data-change="${esc(c.id)}">試玩清單</button>`)));
+    const ar = assetsOf();
+    if (ar?.toReview.length) add("assets-review", todoLi("warn", `${ar.toReview.length} 個素材等你確認`, `美術交件了：${esc(clip(ar.toReview.join("、"), 60))}`, `<button class="btn sm" data-assetgo="待確認">確認素材</button>`));
     if (fbOpen.length + rqOpen.length) add("fb", todoLi("bad", `${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, "看過後請 AI 整理成提案", sayBtn(fbOpen.length ? "看回饋" : "看需求") + `<button class="btn sm" data-go="issues">查看</button>`));
   }
   if (is("程式")) {
@@ -174,23 +197,31 @@ function myTodo(role) {
     by("待驗收").filter(c => c.kind === "技術").forEach(c => add("vf:" + c.id, todoLi("info", `${esc(c.title)} ${kindChip(c)}`, "技術提案做完了：PR 合併、測試通過後跟 AI 說驗收通過", sayBtn(`${c.id} 驗收通過`) + detailBtn(c))));
     by("已同意").forEach(c => add("go:" + c.id, todoLi("", esc(c.title), `${approverOf(c)}已同意，還沒開始做`, sayBtn(`做 ${c.id}`) + detailBtn(c))));
   }
-  for (const r of ["企劃", "美術", "程式", "劇本／數值"]) if (is(r)) roleTasks(r).forEach(({ c, text }) => add("t:" + c.id + text, todoLi("warn", esc(text), `提案：${esc(c.title)}`, detailBtn(c))));
-  if (is("美術") && S.assetTodo?.repo === S.repo && S.assetTodo.n) add("assets", todoLi("warn", `${S.assetTodo.n} 個素材待製作或要修改`, "素材清單（素材.csv）", `<button class="btn sm" data-go="assets">素材庫</button>`));
+  if (is("QA")) {
+    // QA：做完、已上線的提案，照試玩清單一項一項試
+    by("待驗收").forEach(c => add("qa:" + c.id, todoLi(c.qa?.failed ? "bad" : "info", `試玩：${esc(c.title)} ${kindChip(c)}`, esc(qaText(c)), `<button class="btn sm ${c.qa && c.qa.done < c.qa.total ? "primary" : ""}" data-change="${esc(c.id)}">${I("flask", 13)}開始試玩</button>`)));
+  }
+  for (const r of ["企劃", "美術", "程式", "QA", "劇本／數值"]) if (is(r)) roleTasks(r).forEach(({ c, text }) => add("t:" + c.id + text, todoLi("warn", esc(text), `提案：${esc(c.title)}`, detailBtn(c))));
+  if (is("美術")) {
+    const a = assetsOf();
+    if (a?.returned.length) add("assets-back", todoLi("bad", `${a.returned.length} 個素材被退回，要修改`, esc(clip(a.returned.join("、"), 60)), `<button class="btn sm" data-assetgo="退回">看意見</button>`));
+    const make = (a?.toMake.length || 0) - (a?.returned.length || 0);
+    if (make > 0) add("assets", todoLi("warn", `${make} 個素材待製作`, "做好後在素材庫按「交件」", `<button class="btn sm" data-go="assets">素材庫</button>`));
+  }
   const labelled = [...fbOpen, ...rqOpen].filter(i => (me && i.assignees?.includes(me)) || (role !== "全部" && role.split("／").some(r => i.labels?.includes(r))));
   labelled.forEach(i => add("i:" + i.number, todoLi("bad", `#${i.number} ${esc(i.title)}`, i.assignees?.includes(me) ? "指派給你" : `標籤：${esc(role)}`, `<a class="btn sm" href="${esc(i.url)}" target="_blank" rel="noopener">查看</a>`)));
-  if (is("美術") && S.assetTodo?.repo !== S.repo) loadAssetTodo();
+  if (is("美術", "企劃") && !d.assets && S.assetTodo?.repo !== S.repo) loadAssetTodo();
   return items.map(x => x.html);
 }
-// 素材清單裡「待製作／修改」的數量（給美術的待辦）
+// 素材清單摘要：新的管理台資料裡就有（data.assets）；舊資料才自己讀 CSV
+const assetsOf = () => S.data.assets || (S.assetTodo?.repo === S.repo ? S.assetTodo.sum : null);
 async function loadAssetTodo() {
   const repo = S.repo, sheet = (S.data.content || []).find(f => f.ext === "csv" && /素材|asset/i.test(f.name));
-  S.assetTodo = { repo, n: 0 };
+  S.assetTodo = { repo, sum: null };
   if (!sheet) return;
   try {
-    const rows = parseCsv(await (await fetch(raw(sheet.path))).text()), iS = (rows[0] || []).indexOf("狀態");
-    if (iS < 0 || repo !== S.repo) return;
-    S.assetTodo.n = rows.slice(1).filter(r => /待|修改|退回|重做/.test(r[iS] || "")).length;
-    if (S.view === "overview" && S.assetTodo.n) render();
+    S.assetTodo.sum = assetCounts(parseCsv(await (await fetch(raw(sheet.path))).text()));
+    if (repo === S.repo && S.view === "overview") render();
   } catch {}
 }
 
@@ -232,7 +263,7 @@ function flowDiagram() {
   h += at(3, r, node("t3", "thumbsUp", "企劃同意", "討論串勾選、管理台、對話"));
   h += at(4, r, node("t4", "code", "AI 製作", "先寫測試再做・/spectra-apply", "spectra cmd"));
   h += at(5, r, node("t5", "help", "需求有變？", "製作中被要求調整"));
-  h += at(6, r, node("t6", "flask", "試玩驗收", "說「驗收通過」・/spectra-verify", "spectra"));
+  h += at(6, r, node("t6", "flask", "試玩驗收", "照試玩清單試（QA／企劃）・說「驗收通過」", "spectra"));
   h += at(7, r, node("t7", "archive", "規則併回規則書", "/spectra-archive", "spectra cmd"));
   h += at(8, r, node("t8", "checkCircle", "完成", "討論串自動關閉"));
   r++;
@@ -261,7 +292,7 @@ function flowDiagram() {
     for (const s of STAGES) {
       if (s.n === 5) { h += at(5, r, `<span data-node="${c.id}:5" class="node todo" style="opacity:.35"></span>`, "cell small"); continue; }
       if (s.n < st) h += at(s.n, r, `<div class="node done" data-node="${c.id}:${s.n}" title="${s.label}：完成">${I("check", 16)}</div>`, "cell small");
-      else if (s.n === st) h += at(s.n, r, `<div class="node current${c.kind === "技術" ? " tech" : ""}" data-node="${c.id}:${s.n}" data-change="${esc(c.id)}">${I(st === 3 ? "thumbsUp" : st === 4 ? "code" : st === 6 ? "flask" : "fileText", 18)}<b>${esc((c.kind === "技術" ? STAGE_HINT_TECH : STAGE_HINT)[st] || s.label)}</b><small>${st === 4 ? `任務 ${c.tasks.done}/${c.tasks.total}` : esc(c.status)}</small></div>`, "cell small");
+      else if (s.n === st) h += at(s.n, r, `<div class="node current${c.kind === "技術" ? " tech" : ""}" data-node="${c.id}:${s.n}" data-change="${esc(c.id)}">${I(st === 3 ? "thumbsUp" : st === 4 ? "code" : st === 6 ? "flask" : "fileText", 18)}<b>${esc((c.kind === "技術" ? STAGE_HINT_TECH : STAGE_HINT)[st] || s.label)}</b><small>${st === 4 ? `任務 ${c.tasks.done}/${c.tasks.total}` : st === 6 && c.qa ? `清單 ${c.qa.done}/${c.qa.total}${c.qa.failed ? `・${c.qa.failed} 不通過` : ""}` : esc(c.status)}</small></div>`, "cell small");
       else h += at(s.n, r, `<span class="node todo" data-node="${c.id}:${s.n}"></span>`, "cell small");
     }
   }
@@ -383,27 +414,128 @@ V.assets = () => {
   const docs = content.filter(f => f.ext === "md" && catOf(f) === "assets");
   setTimeout(() => sheets[0] && loadAssetSheet(sheets[0].path), 0);
   return vh("image", "素材庫", `圖片 ${imgs.length}・聲音 ${audio.length}・清單 ${docs.length}`, `<button class="btn primary" data-upload>${I("upload", 15)}上傳素材</button>`) +
-    `${sheets.length ? `<div class="card"><h3>${I("table", 14)}素材進度</h3><div id="assetSheet" class="muted">讀取中…</div></div>` : ""}
+    `${sheets.length ? `<div class="card"><h3>${I("table", 14)}素材進度</h3>
+      <p class="muted flowline">${["待製作", "交件", "待確認", "採用／退回", "放進遊戲"].map((s, i) => `${i ? I("chevronRight", 12) : ""}<span>${s}</span>`).join("")}<span class="sep">｜</span>美術做好按「交件」；企劃看過按「採用」或「退回（附意見）」；採用的由 AI 在「同步」時放進遊戲。</p>
+      <div id="assetSheet" class="muted">讀取中…</div></div>` : ""}
     <div class="card"><h3>${I("image", 14)}圖片</h3>${imgs.length ? `<div class="gallery">${imgs.map(f => `<div class="tile" data-img="${esc(f.path)}"><div class="im"><img loading="lazy" src="${raw(f.path)}" alt="${esc(f.title)}"></div><p>${esc(f.name)}</p></div>`).join("")}</div>` : `<div class="empty">還沒有圖片</div>`}</div>
     ${audio.length ? `<div class="card"><h3>${I("volume", 14)}聲音</h3><ul class="list">${audio.map(f => `<li><div class="g">${esc(f.name)}</div><audio controls preload="none" src="${raw(f.path)}"></audio></li>`).join("")}</ul></div>` : ""}
     <div class="card"><h3>${I("fileText", 14)}素材清單與風格指南</h3><div class="row">${docs.map(f => `<button class="btn" data-doc-detail="${esc(f.path)}">${I("fileText", 14)}${esc(f.title)}</button>`).join("") || `<span class="muted">沒有</span>`}</div></div>`;
 };
-async function loadAssetSheet(path) {
+// 素材清單：登入可寫入時用 API 讀最新的（剛交件、剛採用的馬上看得到）；不然讀公開檔案。切換篩選不重新下載
+async function loadAssetSheet(path, fresh = false) {
   const el = $("#assetSheet"); if (!el) return;
   try {
-    const rows = parseCsv(await (await fetch(raw(path))).text());
-    const head = rows[0] || [], body = rows.slice(1).filter(r => r.some(Boolean));
-    const iS = head.indexOf("狀態"), iC = head.indexOf("類別");
-    const states = ["全部", ...new Set(body.map(r => r[iS]).filter(Boolean))], cats = ["全部", ...new Set(body.map(r => r[iC]).filter(Boolean))];
-    const show = body.filter(r => (S.assetFilter === "全部" || r[iS] === S.assetFilter) && (S.assetCat === "全部" || r[iC] === S.assetCat));
-    const cnt = s => body.filter(r => r[iS] === s).length;
-    const cols = head.map((h, i) => [h, i]).filter(([h]) => !/提示詞|Figma/.test(h));
-    el.className = "";
-    el.innerHTML = `${iS >= 0 ? `<div class="filters">${states.map(s => `<button class="fbtn" data-af="${esc(s)}" aria-pressed="${S.assetFilter === s}">${esc(s)} ${s !== "全部" ? cnt(s) : body.length}</button>`).join("")}</div>` : ""}
-      ${iC >= 0 ? `<div class="filters">${cats.map(s => `<button class="fbtn" data-ac="${esc(s)}" aria-pressed="${S.assetCat === s}">${esc(s)}</button>`).join("")}</div>` : ""}
-      <div class="tablewrap"><table class="t"><thead><tr>${cols.map(([h]) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${show.map(r => `<tr>${cols.map(([, i]) => `<td>${i === iS ? `<span class="chip ${/完成|放進/.test(r[i]) ? "c-ok" : /待/.test(r[i]) ? "c-warn" : ""}">${esc(r[i])}</span>` : esc(r[i] || "")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
-      <p class="muted">來源：<a href="${blob(path)}" target="_blank" rel="noopener">${esc(path)}</a></p>`;
+    const key = S.repo + ":" + path;
+    if (fresh || S.assetText?.key !== key) {
+      const text = canWrite() ? (await readFile(S.repo, path, S.data.branch)).text : await (await fetch(raw(path) + `?t=${Date.now()}`)).text();
+      S.assetText = { key, path, text };
+    }
+    renderAssetSheet(el, path, S.assetText.text);
   } catch (e) { el.textContent = "讀不到素材清單：" + e.message; }
+}
+const assetChip = s => `<span class="chip ${/已放進|完成|已採用/.test(s) ? "c-ok" : s === "待確認" ? "c-info" : /退回|修改|重做/.test(s) ? "c-bad" : /待/.test(s) ? "c-warn" : ""}">${esc(s)}</span>`;
+function renderAssetSheet(el, path, text) {
+  const rows = parseCsv(text), head = rows[0] || [];
+  const body = rows.map((r, idx) => ({ r, idx })).slice(1).filter(x => x.r.some(Boolean));
+  const iS = head.indexOf("狀態"), iC = head.indexOf("類別"), iD = head.indexOf("交件"), iF = head.indexOf("意見");
+  const seen = [...new Set(body.map(x => x.r[iS]).filter(Boolean))];
+  const states = ["全部", ...ASSET_STATES.filter(s => seen.includes(s)), ...seen.filter(s => !ASSET_STATES.includes(s))], cats = ["全部", ...new Set(body.map(x => x.r[iC]).filter(Boolean))];
+  const show = body.filter(({ r }) => (S.assetFilter === "全部" || r[iS] === S.assetFilter) && (S.assetCat === "全部" || r[iC] === S.assetCat));
+  const cnt = s => body.filter(x => x.r[iS] === s).length;
+  const cols = head.map((h, i) => [h, i]).filter(([h]) => !/提示詞|Figma|^交件$|^意見$/.test(h));
+  const files = r => (iD >= 0 ? r[iD] || "" : "").split(/[；;]/).map(s => s.trim()).filter(Boolean);
+  const sent = r => `${files(r).map(p => IMG.test(p.split(".").pop().toLowerCase()) ? `<button class="thumb" data-img="${esc(p)}" title="${esc(p)}"><img loading="lazy" src="${raw(p)}" alt=""></button>` : `<a href="${blob(p)}" target="_blank" rel="noopener">${esc(p.split("/").pop())}</a>`).join("")}${iF >= 0 && r[iF] ? `<div class="note">${I("message", 12)}${esc(r[iF])}</div>` : ""}`;
+  const act = ({ r, idx }) => { const s = (r[iS] || "").trim();
+    if (s === "待確認") return `<button class="btn sm ok" data-aok="${idx}">${I("check", 13)}採用</button><button class="btn sm" data-aback="${idx}">${I("x", 13)}退回</button>`;
+    if (s === "已採用") return `<span class="muted">等 AI 放進遊戲</span>`;
+    if (/已放進|完成/.test(s)) return "";
+    return `<button class="btn sm" data-asend="${idx}">${I("upload", 13)}交件</button>`; };
+  el.className = "";
+  el.innerHTML = `${iS >= 0 ? `<div class="filters">${states.map(s => `<button class="fbtn" data-af="${esc(s)}" aria-pressed="${S.assetFilter === s}">${esc(s)} ${s !== "全部" ? cnt(s) : body.length}</button>`).join("")}</div>` : ""}
+    ${iC >= 0 ? `<div class="filters">${cats.map(s => `<button class="fbtn" data-ac="${esc(s)}" aria-pressed="${S.assetCat === s}">${esc(s)}</button>`).join("")}</div>` : ""}
+    <div class="tablewrap"><table class="t assets"><thead><tr>${cols.map(([h, i]) => `<th>${esc(h)}</th>${i === iS ? "<th></th><th>交件／意見</th>" : ""}`).join("")}</tr></thead><tbody>${show.map(x => `<tr>${cols.map(([, i]) => `<td>${i === iS ? assetChip(x.r[i] || "") : esc(x.r[i] || "")}</td>${i === iS ? `<td class="acts">${act(x)}</td><td class="sent">${sent(x.r)}</td>` : ""}`).join("")}</tr>`).join("") || `<tr><td colspan="${cols.length + 2}" class="empty">沒有這個狀態的素材</td></tr>`}</tbody></table></div>
+    <p class="muted">來源：<a href="${blob(path)}" target="_blank" rel="noopener">${esc(path)}</a></p>`;
+}
+const assetRow = idx => { const rows = parseCsv(S.assetText?.text || ""), head = rows[0] || []; return { rows, head, r: rows[idx] || [], name: (rows[idx] || [])[Math.max(0, head.indexOf("檔名"))] || "" }; };
+// 寫入素材清單後：畫面、待辦數字立刻更新（不用等 GitHub Actions）
+function afterAssetSave(text) {
+  S.assetText = { ...S.assetText, text };
+  S.data.assets = { path: S.assetText.path, ...assetCounts(parseCsv(text)) };
+  const el = $("#assetSheet"); if (el) renderAssetSheet(el, S.assetText.path, text);
+}
+async function doAssetSend(idx) {
+  const { name } = assetRow(idx); if (!name) return;
+  const dir = `${(S.data.contentDirs || ["docs/企劃"])[0]}/圖/交件`;
+  if (!canWrite()) {
+    const v = await dialog(`交件：${name}`, `<ol class="steps"><li>按「打開 GitHub 上傳頁」，把做好的檔案拖進去，按 <b>Commit changes</b></li><li>回來按「複製給 AI 的話」，貼到 Claude：AI 會把這一列改成「待確認」，企劃就會看到</li></ol><p class="muted">設定登入碼的話，可以直接在這裡上傳，一步完成。</p>`, [["", "取消"], ["say", "複製給 AI 的話"], ["ok", "打開 GitHub 上傳頁", "primary"]]);
+    if (v === "ok") openWeb(web.upload(dir), "上傳完回來按「交件」→「複製給 AI 的話」");
+    if (v === "say") copySay(`素材 ${name} 交件了`);
+    return;
+  }
+  const v = await dialog(`交件：${name}`, `${target()}<label class="fld"><span>做好的檔案（可以多個，例如不同表情）</span><input name="files" type="file" accept="image/*,audio/*" multiple required></label><label class="fld"><span>給企劃的話（選填）</span><input name="note" placeholder="例：眼睛照上次意見放大了"></label><p class="muted">會放到 <code>${esc(dir)}/</code>，這一列改成「待確認」，企劃的待辦會出現。</p>`, [["", "取消"], ["ok", "交件", "primary"]]);
+  if (v !== "ok") return;
+  const f = $("#dlg form"), list = [...(f.files.files || [])], note = f.note.value.trim(); if (!list.length) return;
+  toast("上傳中…", 30000);
+  try {
+    const paths = [];
+    for (const file of list) {
+      const r = await uploadFile(S.repo, `${dir}/${file.name}`, file, `素材交件：${name} 上傳 ${file.name}（管理台，${auth.user.login}）`, S.data.branch);
+      paths.push(r.path);
+      S.data.content.push({ path: r.path, name: r.path.split("/").pop(), ext: r.path.split(".").pop().toLowerCase(), size: file.size, title: r.path.split("/").pop() });
+    }
+    const { text } = await saveAssetRow(S.repo, S.assetText.path, idx, name, { 狀態: "待確認", 交件: paths.join("；"), 意見: note ? `美術：${note}` : "" }, `素材交件：${name}（管理台，${auth.user.login}）`, S.data.branch);
+    afterAssetSave(text); toast(`已交件：${name}，等企劃確認`);
+  } catch (e) { toast("交件失敗：" + e.message, 7000); }
+}
+async function doAssetReview(idx, ok) {
+  const { name, r, head } = assetRow(idx); if (!name) return;
+  const shots = (r[head.indexOf("交件")] || "").split(/[；;]/).map(s => s.trim()).filter(p => p && IMG.test(p.split(".").pop().toLowerCase()));
+  const preview = shots.length ? `<div class="thumbs">${shots.map(p => `<img src="${raw(p)}" alt="">`).join("")}</div>` : "";
+  const v = await dialog(ok ? `採用：${name}` : `退回：${name}`, `${canWrite() ? target() : ""}${preview}${ok ? `<p>確定採用 <b>${esc(name)}</b>？採用後，對 AI 說「同步」就會把它放進遊戲。</p>` : `<label class="fld"><span>要怎麼改（美術會在待辦看到）</span><textarea name="why" required placeholder="例：眼睛再大一點，顏色跟第 1 區的招牌一樣亮"></textarea></label>`}${canWrite() ? "" : `<p class="muted">沒有登入碼：按下去會複製一句話，貼到 Claude，AI 會幫你改清單。</p>`}`, [["", "取消"], ["ok", ok ? "採用" : "退回", ok ? "ok" : "primary"]]);
+  if (v !== "ok") return;
+  const why = ok ? "" : $("#dlg form").why.value.trim();
+  if (!ok && !why) return;
+  if (!canWrite()) { copySay(ok ? `素材 ${name} 採用` : `素材 ${name} 退回：${why}`); return; }
+  try {
+    const { text } = await saveAssetRow(S.repo, S.assetText.path, idx, name, ok ? { 狀態: "已採用", 意見: "" } : { 狀態: "退回", 意見: `企劃：${why}` }, `素材${ok ? "採用" : "退回"}：${name}（管理台，${auth.user.login}）`, S.data.branch);
+    afterAssetSave(text); toast(ok ? `已採用 ${name}：對 AI 說「同步」會放進遊戲` : `已退回 ${name}，美術會看到你的意見`, 6000);
+  } catch (e) { toast((ok ? "採用" : "退回") + "失敗：" + e.message, 7000); }
+}
+
+// ---------- 試玩清單：勾選、不通過 ----------
+async function doQaSet(id, i, done) {
+  const c = S.data.changes.find(x => x.id === id); if (!c?.qa) return;
+  if (!canTriage()) { openWeb(c.qa.url, `在 GitHub 的試玩清單${done ? "勾起" : "取消勾選"}第 ${i + 1} 項（手機 GitHub App 也可以勾）`); return; }
+  try {
+    const body = await qaSet(S.repo, c.qa.number, i, done);
+    Object.assign(c.qa, parseQa(body)); render();
+    toast(c.qa.done === c.qa.total ? `全部通過！企劃確認後對 AI 說「${c.id} 驗收通過」` : done ? "已勾：這項沒問題" : "已取消勾選", 5000);
+  } catch (e) { toast("勾選失敗：" + e.message, 7000); }
+}
+async function doQaFail(id, i) {
+  const c = S.data.changes.find(x => x.id === id); if (!c?.qa) return;
+  const item = c.qa.items[i]?.text || "", inApp = canTriage();
+  const v = await dialog(`不通過：第 ${i + 1} 項`, `${target()}<div class="ask">${esc(item)}</div>
+    <label class="fld"><span>哪裡不對（越具體越好：第幾關、做了什麼、看到什麼）</span><textarea name="what" required placeholder="例：第 3 關還是看得到預測線，第 4 關才消失"></textarea></label>
+    <div class="row"><label class="fld" style="flex:1"><span>用什麼玩</span><select name="device"><option>手機</option><option>平板</option><option>電腦</option></select></label><label class="fld" style="flex:1"><span>版本或日期（選填）</span><input name="version"></label></div>
+    ${inApp ? `<label class="fld"><span>截圖（選填）</span><input name="shots" type="file" accept="image/*" multiple></label>` : `<p class="muted">會打開填好的 GitHub 回饋表單，截圖可以拖進去，按 Create 送出。</p>`}
+    <p class="muted">會開一則 🔴 必修回饋，連到這張提案。AI 修好上線後，回來再試這一項。</p>`, [["", "取消"], ["ok", inApp ? "送出不通過" : "下一步：到 GitHub 送出", "primary"]]);
+  if (v !== "ok") return;
+  const f = $("#dlg form"), what = f.what.value.trim(); if (!what) return;
+  const where = `試玩清單 #${c.qa.number} 第 ${i + 1} 項「${item}」（提案 ${c.id}）`, title = `🔴 試玩不通過：${c.title}－${clip(item, 24)}`;
+  if (!inApp) {
+    const fields = { title: `回饋：${title}`, level: "🔴 必修（不改不行）", version: f.version.value.trim(), what: `${what}\n\n${where}`, device: f.device.value };
+    for (const k in fields) if (!fields[k]) delete fields[k];
+    openWeb(web.issueForm("feedback", fields),"已打開 GitHub：按 Create 送出。之後對 AI 說「同步」，AI 會把回饋標回試玩清單");
+    return;
+  }
+  toast("送出中…", 20000);
+  try {
+    const fb = await createIssue(S.repo, "回饋", { __title: title, "等級": "🔴 必修（不改不行）", "試玩的版本或日期": f.version.value.trim(), "發生什麼事／想要什麼感覺": what, "用什麼玩": f.device.value, "試玩清單": where }, [...(f.shots.files || [])], S.data.branch, (S.data.contentDirs || ["docs/企劃"])[0]);
+    S.data.feedback.unshift({ number: fb.number, title: fb.title, url: fb.html_url, state: "open", created: fb.created_at, user: auth.user.login, labels: ["回饋"], comments: 0 });
+    Object.assign(c.qa, parseQa(await qaFail(S.repo, c.qa.number, i, fb.number))); render();
+    toast(`已開回饋 #${fb.number}（🔴 必修）；對 AI 說「看回饋」就會修`, 7000);
+  } catch (e) { toast("送出失敗：" + e.message, 7000); }
 }
 
 V.tools = () => {
@@ -442,6 +574,8 @@ const GLOSSARY = [
   ["規則書", "遊戲「現在」的運作規則（也叫規格書）。只能透過提案改，每條規則都有自動測試"],
   ["規劃書", "企劃寫的想法與方向（企劃書），可以隨時改。想做的事要開提案才會進規則書"],
   ["待同意", "提案寫好了，等企劃看過按同意（技術提案由程式同意）"],
+  ["試玩清單", "提案做完、上線後自動開的清單（GitHub 討論串，手機 App 也能勾）：QA 或企劃一項一項試，沒問題就勾；不通過會自動開 🔴 必修回饋。全部勾完再說「驗收通過」"],
+  ["素材確認", "美術在素材庫按「交件」上傳 → 狀態變「待確認」→ 企劃按「採用」或「退回（附意見）」→ 採用的由 AI 在「同步」時放進遊戲，狀態變「已放進遊戲」"],
   ["技術提案", "程式提出的重構、效能、工具等改動，不改玩法和規則書。由程式同意，做完開 PR，程式審查合併後才上線"],
   ["已同意／製作中", "企劃同意了；AI 正在照任務清單做（進度條＝完成的任務）"],
   ["待驗收", "做完、已上線：請試玩，沒問題就說「xxx 驗收通過」"],
@@ -458,23 +592,12 @@ V.help = () => vh("help", "說明") + `<div class="grid2" style="margin-top:0"><
   <h2>流程圖</h2><p>上方是兩條<b>標準流程</b>：<b>企劃提案</b>（玩法、畫面、數值；企劃同意、試玩驗收）與<b>技術提案</b>（重構、效能、工具；程式同意、開 PR 給程式審查、合併才上線）；下方每張<b>進行中的提案</b>一條泳道：綠色勾＝走過、亮色格子＝目前在這一步（點開看明細）、空心點＝還沒到。右上角可以切到「結構樹」看每一份文件與任務。</p>
   <h2>同意提案</h2><p>在首頁或提案明細按「同意」；也可以在 GitHub 討論串勾 ☐ 企劃同意、Spectra 桌面版勾任務 0.1、Notion 改「同意」，或對 AI 說「同意 xxx」。</p>
   <h2>AI 怎麼配合管理台</h2><p>管理台是給人<b>看進度、做決定</b>的地方（同意、回饋、編輯）；<b>叫 AI 做事一律在 Claude 裡下指令</b>。需要 AI 的地方會有「對 AI 說…」按鈕：按一下複製指令，貼到 Claude 就好。AI 寫好的提案、做完的任務、處理過的回饋，推上 GitHub 後約 1 分鐘就會出現在管理台。</p>
-  <h2>內容庫與素材庫</h2><p>劇本、角色、世界觀、名詞、數值、規劃書。每份文件右上角有「編輯」，分類頁有「新文件」；素材庫可以上傳。</p>
+  <h2>內容庫與素材庫</h2><p>劇本、角色、世界觀、名詞、數值、規劃書。每份文件右上角有「編輯」，分類頁有「新文件」。素材庫的素材進度表：美術做好按「交件」，企劃按「採用」或「退回」，採用的由 AI 放進遊戲。</p>
+  <h2>試玩清單（QA）</h2><p>提案做完、上線後，會自動開一份試玩清單。角色選「QA」（或企劃自己試），在提案明細一項一項勾；有問題按「不通過」寫下哪裡怪，會自動開一則 🔴 必修回饋。全部通過後企劃說「驗收通過」。</p>
   <h2>資料多新</h2><p>推上 GitHub、討論串或 PR 有變動、部署完成時自動更新（約 1 分鐘），另外每小時一次。</p></div>
   <div class="card"><h3>${I("book", 14)}名詞小抄</h3><dl class="gloss">${GLOSSARY.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div></div>`;
 
 // ---------- 文件閱讀 ----------
-function parseCsv(text) {
-  text = text.replace(/^﻿/, ""); const rows = []; let row = [], cell = "", q = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; }
-    else if (ch === '"') q = true; else if (ch === ",") { row.push(cell); cell = ""; }
-    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
-    else cell += ch;
-  }
-  if (cell || row.length) { row.push(cell); rows.push(row); }
-  return rows;
-}
 const resolvePath = (base, rel) => { const parts = base.split("/").slice(0, -1); for (const seg of decodeURIComponent(rel).split("/")) { if (seg === "..") parts.pop(); else if (seg && seg !== ".") parts.push(seg); } return parts.join("/"); };
 async function openDoc(path, target) {
   const el = typeof target === "string" ? $(target) : target; if (!el) return;
@@ -531,6 +654,7 @@ function go(route, push = true) {
   let [v, ...rest] = route.split("/");
   if (v === "tree") { v = "flow"; S.flowMode = "tree"; } // 舊網址相容
   S.view = V[v] ? v : "overview"; S.arg = rest.join("/");
+  if (S.view === "assets" && S.arg) { S.assetFilter = decodeURIComponent(S.arg); S.assetCat = "全部"; } // 手機工作台的「確認素材」：#assets/待確認
   if (push) history.pushState(null, "", urlFor(S.repo, [S.view, S.arg].filter(Boolean).join("/")));
   closeProjMenu(); render(); document.body.classList.remove("drawer");
 }
@@ -810,10 +934,16 @@ async function doUpload() {
 }
 // 寫入動作：有登入碼（而且有權限）就直接在管理台做；沒有就打開預先填好的 GitHub 網頁
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-approve],[data-comment],[data-newissue],[data-edit],[data-newdoc],[data-upload],[data-say],[data-role]");
+  const t = e.target.closest("[data-approve],[data-comment],[data-newissue],[data-edit],[data-newdoc],[data-upload],[data-say],[data-role],[data-qa],[data-qafail],[data-assetgo],[data-asend],[data-aok],[data-aback]");
   if (!t) return;
   e.preventDefault();
   if (t.dataset.role) { S.role = t.dataset.role; store.set("console:role", S.role); render(); return; }
+  if (t.dataset.assetgo) { S.assetFilter = t.dataset.assetgo; S.assetCat = "全部"; go("assets"); return; }
+  if (t.dataset.qa) { const [id, i, v] = t.dataset.qa.split(":"); doQaSet(id, +i, v === "1"); return; }
+  if (t.dataset.qafail) { const [id, i] = t.dataset.qafail.split(":"); doQaFail(id, +i); return; }
+  if (t.dataset.asend) { doAssetSend(+t.dataset.asend); return; }
+  if (t.dataset.aok) { doAssetReview(+t.dataset.aok, true); return; }
+  if (t.dataset.aback) { doAssetReview(+t.dataset.aback, false); return; }
   if (t.dataset.say) { copySay(t.dataset.say); return; }
   const inApp = canTriage();
   if (t.dataset.approve) inApp ? doApprove(t.dataset.approve) : webApprove(t.dataset.approve);
@@ -872,7 +1002,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610071500"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610071900"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}

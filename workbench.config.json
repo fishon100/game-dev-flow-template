@@ -9,5 +9,7 @@
   "_tools說明": "專案工具（外掛）：框架以外、這個專案自己的工具，會出現在管理台左側「專案工具」。icon 可用 wrench、table、chart、image、gamepad、code、flask、book、users、globe、tag、play、sparkles",
   "tools": [
     { "label": "測試頁", "url": "https://fishon100.github.io/game-dev-flow-template/test.html", "icon": "flask", "desc": "瀏覽器自動測試（版面、畫面）" }
-  ]
+  ],
+  "_qa_always說明": "試玩清單每次都要試的項目（提案做完上線後自動開的試玩清單，最後會加上這幾項）",
+  "qa_always": ["在手機上從頭玩到這次改的地方，沒有卡頓、跑版或錯字"]
 }

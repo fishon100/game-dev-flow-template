@@ -2,11 +2,12 @@
 //  1. Issue 裡勾了「企劃同意」（技術提案是「程式同意」）→ 把 tasks.md 的 0.1 打勾並註明來源（之後由 workflow commit）
 //  2. 每張待同意的提案都有一個「提案」Issue（沒有就開，企劃在手機就能看、能勾）
 //  3. 已同意的 Issue 貼「已同意」標籤；已完成的提案把 Issue 關掉
+//  3b. 做完（待驗收）的提案開「試玩清單」討論串（QA／企劃一項一項勾）；全部勾完貼「試玩通過」；已完成就關掉
 //  4. 產生工作台資料 workbench-out/data.json（由 workflow 推到 workbench-data 分支）
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { readSpectra, approveTasks, approvalIssueBody, indexContent, approverOf, ISSUE_MARKER_RE, ISSUE_APPROVE_RE } from "./lib.mjs";
+import { readSpectra, approveTasks, approvalIssueBody, indexContent, approverOf, ISSUE_MARKER_RE, ISSUE_APPROVE_RE, qaItems, qaIssueBody, parseQa, assetSummary, QA_MARKER_RE, QA_ALWAYS } from "./lib.mjs";
 
 const root = process.cwd();
 const repo = process.env.GITHUB_REPOSITORY;
@@ -27,7 +28,7 @@ async function gh(path, init = {}) {
 }
 const post = (p, body, method = "POST") => gh(p, { method, body: JSON.stringify(body) });
 
-const LABELS = { 提案: "5319e7", 技術: "6f42c1", 已同意: "0e8a16", 需求: "1d76db", 回饋: "d93f0b" };
+const LABELS = { 提案: "5319e7", 技術: "6f42c1", 已同意: "0e8a16", 需求: "1d76db", 回饋: "d93f0b", 試玩: "fbca04", 試玩通過: "0e8a16" };
 for (const [name, color] of Object.entries(LABELS)) await post("/labels", { name, color }); // 已存在會回 422，忽略
 
 // ---- 1. 同意：任何一個提案 Issue 勾了「企劃同意」，就把 tasks.md 0.1 打勾 ----
@@ -50,7 +51,8 @@ let allIssues = await listIssues();
 {
   const first = new Map();
   for (const i of [...allIssues].sort((a, b) => a.number - b.number)) {
-    const id = (i.body || "").match(ISSUE_MARKER_RE)?.[1]; if (!id) continue;
+    // 提案的討論串用提案名稱；試玩清單用「qa:提案名稱」
+    const b = i.body || "", qa = b.match(QA_MARKER_RE)?.[1], id = b.match(ISSUE_MARKER_RE)?.[1] || (qa && "qa:" + qa); if (!id) continue;
     if (!first.has(id)) { first.set(id, i.number); continue; }
     if (i.state === "open") {
       await post(`/issues/${i.number}/comments`, { body: `重複了，請看 #${first.get(id)}。` });
@@ -122,6 +124,30 @@ for (const c of changes) {
   c.issue = { number: issue.number, url: issue.html_url, state: issue.state, comments: issue.comments };
 }
 
+// ---- 3b. 試玩清單 ----
+const qaOf = id => allIssues.find(i => (i.body || "").match(QA_MARKER_RE)?.[1] === id);
+const playUrl = ((cfg.links || []).find(l => /試玩/.test(l.label)) || (cfg.links || [])[0])?.url || "";
+for (const c of changes) {
+  let qa = qaOf(c.id);
+  if (!c.archived && c.status === "待驗收" && !qa) {
+    qa = await post("/issues", { title: `試玩清單：${c.title}（${c.id}）`, body: qaIssueBody(c, qaItems(c, cfg.qa_always || QA_ALWAYS), repoUrl, specDir, playUrl), labels: ["試玩"] });
+    allIssues.push(qa);
+    console.log(`開試玩清單 #${qa.number}：${c.id}`);
+  }
+  if (!qa) continue;
+  const q = parseQa(qa.body || "");
+  if (c.archived && qa.state === "open") {
+    await post(`/issues/${qa.number}/comments`, { body: `🎉 提案 \`${c.id}\` 已驗收通過（${c.date}）。` });
+    await post(`/issues/${qa.number}`, { state: "closed", state_reason: "completed" }, "PATCH");
+    qa.state = "closed";
+  } else if (!c.archived && q.total && q.done === q.total && !hasLabel(qa, "試玩通過")) {
+    await post(`/issues/${qa.number}/labels`, { labels: ["試玩通過"] });
+    await post(`/issues/${qa.number}/comments`, { body: `✅ 試玩清單 ${q.total} 項全部通過。企劃確認後對 AI 說「${c.id} 驗收通過」。` });
+    qa.labels = [...(qa.labels || []), { name: "試玩通過" }];
+  }
+  c.qa = { number: qa.number, url: qa.html_url, state: qa.state, ...q };
+}
+
 // ---- 4. 工作台資料 ----
 const pick = label => allIssues.filter(i => i.labels?.some(l => (l.name || l) === label))
   .map(i => ({ number: i.number, title: i.title, url: i.html_url, state: i.state, created: i.created_at, user: i.user?.login, labels: i.labels.map(l => l.name || l), comments: i.comments, assignees: (i.assignees || []).map(a => a.login) }));
@@ -139,12 +165,16 @@ const runs = allRuns
     title: (r.head_commit?.message || r.display_title || "").split("\n")[0],
   }));
 const { specs } = readSpectra(root, specDir);
+// 素材清單（檔名有「素材」的 CSV）：美術要做、企劃要確認、要放進遊戲的
+const content = indexContent(root, cfg.content_dirs || ["docs/企劃"]);
+const sheet = content.find(f => f.ext === "csv" && /素材|asset/i.test(f.name));
+const assets = sheet ? { path: sheet.path, ...assetSummary(readFileSync(join(root, sheet.path), "utf8")) } : null;
 const data = {
   generatedAt: new Date().toISOString(),
   repo, repoUrl, specDir,
   branch: process.env.GITHUB_REF_NAME && !process.env.GITHUB_REF_NAME.includes("/") ? process.env.GITHUB_REF_NAME : "main",
   contentDirs: cfg.content_dirs || ["docs/企劃"],
-  content: indexContent(root, cfg.content_dirs || ["docs/企劃"]),
+  content, assets,
   name: cfg.name || repo.split("/")[1],
   links: cfg.links || [],
   tools: cfg.tools || [], // 專案工具（外掛）：框架以外、這個專案自己的工具
