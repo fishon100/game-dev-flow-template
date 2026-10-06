@@ -1,0 +1,62 @@
+// 「同步」：企劃回到對話時，AI 先跑這支，把企劃在管理台（或 GitHub、手機）做過、等 AI 接手的事列出來。
+// 用法：git pull 之後 node tools/workbench/whats-new.mjs
+// 讀：提案狀態（docs/spectra）、GitHub 討論串（gh）、管理台送來的修改（git log）、關卡編輯器的修改檔（有的專案才有）
+import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { execSync } from "node:child_process";
+import { readSpectra, ISSUE_MARKER_RE } from "./lib.mjs";
+
+const root = process.cwd();
+const cfg = existsSync("workbench.config.json") ? JSON.parse(readFileSync("workbench.config.json", "utf8")) : {};
+const sh = cmd => { try { return execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return ""; } };
+const json = cmd => { try { return JSON.parse(sh(cmd) || "null"); } catch { return null; } };
+const STAMP = join(root, ".git", "whats-new-last");               // 上次「同步」的時間（只在這台電腦，不進 git）
+const since = existsSync(STAMP) ? readFileSync(STAMP, "utf8").trim() : sh('git log -1 --format=%cI --before="2 days ago"') || "";
+const out = [], todo = [];
+const section = (title, lines) => { if (lines.length) out.push(`\n■ ${title}`, ...lines.map(l => `  ・${l}`)); };
+
+// 1. 提案
+const { changes } = readSpectra(root, cfg.spec_dir || "docs/spectra");
+const act = changes.filter(c => !c.archived), by = s => act.filter(c => c.status === s);
+section("等企劃同意的提案", by("待同意").map(c => `${c.title}（${c.id}）`));
+section("已同意、還沒開始做（可以直接做到上線）", by("已同意").map(c => { todo.push(`做 ${c.id}`); return `${c.title}（${c.id}）・${c.tasks.approvalNote || "已同意"}`; }));
+section("製作中", by("製作中").map(c => { todo.push(`繼續做 ${c.id}`); return `${c.title}（${c.id}）・任務 ${c.tasks.done}/${c.tasks.total}・下一步：${c.tasks.next}`; }));
+section("做完了，等企劃試玩驗收", by("待驗收").map(c => `${c.title}（${c.id}）→ 試玩後說「${c.id} 驗收通過」`));
+
+// 2. GitHub 討論串：提案的新留言（最後一則是人留的）、還沒處理的回饋與需求
+const issues = json("gh issue list --state open --limit 100 --json number,title,labels,body,url") || [];
+const bot = a => !a || /\[bot\]$|^github-actions/.test(a);
+const notes = [];
+for (const i of issues.filter(i => ISSUE_MARKER_RE.test(i.body || ""))) {
+  const cm = (json(`gh issue view ${i.number} --json comments`) || {}).comments || [];
+  const last = cm.filter(c => !/^(👍|✅|🔄|🎉)/.test(c.body || "")).at(-1);
+  if (last && !bot(last.author?.login) && (!since || last.createdAt > since)) {
+    const id = (i.body.match(ISSUE_MARKER_RE) || [])[1];
+    notes.push(`#${i.number} ${id}：${last.author.login} 留言「${(last.body || "").replace(/\s+/g, " ").slice(0, 60)}」`);
+    todo.push(`看提案 ${id} 的留言`);
+  }
+}
+section("提案討論串有新留言（照留言改提案）", notes);
+const lab = (i, n) => (i.labels || []).some(l => l.name === n);
+section("還沒處理的回饋", issues.filter(i => lab(i, "回饋")).map(i => { todo.push(`把 #${i.number} 開成提案（或直接修）`); return `#${i.number} ${i.title}`; }));
+section("還沒處理的需求", issues.filter(i => lab(i, "需求")).map(i => { todo.push(`把 #${i.number} 開成提案`); return `#${i.number} ${i.title}`; }));
+
+// 3. 管理台送來的修改（commit 訊息有「管理台」）：同意、編輯文件、上傳素材
+const log = since ? sh(`git log --since="${since}" --format=%h%x09%an%x09%s`) : "";
+// 管理台寫入的 commit 會帶「（管理台，帳號）」；在 GitHub 討論串勾同意由 Action 寫入（「來自 GitHub Issue」）
+const fromConsole = log.split("\n").filter(l => /（管理台，|來自 GitHub Issue/.test(l)).map(l => { const [h, a, s] = l.split("\t"); return `${s}（${a}，${h}）`; });
+section("在管理台做的修改（上次同步之後）", fromConsole);
+if (fromConsole.some(s => /內容：|素材：/.test(s)) && existsSync("tools/vault-mirror.mjs")) todo.push("企劃文件同步回 Obsidian（node tools/vault-mirror.mjs）");
+
+// 4. 關卡編輯器送出、還沒套用的修改（有關卡編輯器的專案）
+const ED = join(root, "tools", "levels", "edits");
+if (existsSync(ED)) {
+  const files = readdirSync(ED).filter(f => f.endsWith(".json")).sort();
+  section("關卡編輯器送出、還沒套用", files.map(f => { const e = JSON.parse(readFileSync(join(ED, f), "utf8")); return `${f}${e.note ? `「${e.note}」` : ""}：第 ${Object.keys(e.stages || {}).join("、") || "—"} 關${Object.keys(e.layouts || {}).length ? `、台面 ${Object.keys(e.layouts).join("、")}` : ""}`; }));
+  if (files.length) todo.push("套用關卡修改");
+}
+
+console.log(`同步：${cfg.name || root}${since ? `（上次同步 ${since.slice(0, 16).replace("T", " ")}）` : ""}`);
+console.log(out.length ? out.join("\n") : "\n沒有等 AI 接手的事。");
+if (todo.length) console.log(`\n建議接著做：\n${[...new Set(todo)].map(t => `  → ${t}`).join("\n")}`);
+if (!process.argv.includes("--dry")) { mkdirSync(join(root, ".git"), { recursive: true }); writeFileSync(STAMP, new Date().toISOString()); }
