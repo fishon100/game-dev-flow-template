@@ -181,6 +181,10 @@ table.t { width: 100%; border-collapse: collapse; }
 .lane-label { display: flex; align-items: center; z-index: 1; padding-right: 10px; }
 .pill { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 36px; padding: 0 12px; border-radius: var(--r); font-weight: 600; font-size: 13px; color: #fff; background: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; border: 0; }
 .pill.brand { background: var(--accent); color: var(--accent-ink); }
+.pill.tech { background: var(--violet); color: var(--panel); }
+.pill.change.is-tech { border-left: 3px solid var(--violet); }
+.node.tech { background: color-mix(in srgb, var(--violet-soft) 70%, var(--panel)); border-color: color-mix(in srgb, var(--violet) 35%, var(--line)); }
+.node.tech .ico { color: var(--violet); }
 .pill.change { background: var(--panel); color: var(--ink); border: 1px solid var(--line); height: auto; min-height: 40px; padding: 6px 12px; white-space: normal; flex-direction: column; align-items: flex-start; gap: 2px; cursor: pointer; text-align: left; }
 .pill.change:hover { border-color: var(--line-strong); }
 .pill.change small { color: var(--faint); font-family: var(--mono); font-size: 10.5px; font-weight: 400; }
@@ -196,6 +200,8 @@ table.t { width: 100%; border-collapse: collapse; }
 .node.cmd b { font-family: var(--mono); font-size: 11.5px; }
 .node.current { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 4px var(--accent-soft); cursor: pointer; }
 .node.current .ico, .node.current small { color: color-mix(in srgb, var(--accent-ink) 80%, transparent); }
+.node.current.tech { background: var(--violet); border-color: var(--violet); color: var(--panel); box-shadow: 0 0 0 4px var(--violet-soft); }
+.node.current.tech .ico, .node.current.tech small { color: color-mix(in srgb, var(--panel) 80%, transparent); }
 .node.done { min-height: 0; width: 28px; height: 28px; padding: 0; border-radius: 50%; background: var(--ok); border-color: var(--ok); color: #fff; }
 .node.done .ico { color: #fff; margin: 0; }
 .node.todo { min-height: 0; width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--panel); box-shadow: none; }
@@ -204,6 +210,7 @@ table.t { width: 100%; border-collapse: collapse; }
 .flow svg.links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
 .links path { fill: none; stroke: var(--line-strong); stroke-width: 2; }
 .links path.on { stroke: var(--accent); }
+.links path.tech { stroke: var(--violet); }
 .links path.done { stroke: var(--ok); }
 .links path.dash { stroke-dasharray: 5 5; }
 .links text { font: 600 11px var(--font); fill: var(--accent); }
@@ -377,6 +384,6 @@ dialog::backdrop { background: rgb(10 10 20 / .45); }
 </div>
 <dialog id="dlg"></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=202610071200"></script>
+<script type="module" src="app.js?v=202610071500"></script>
 </body>
 </html>

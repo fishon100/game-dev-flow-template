@@ -1,8 +1,8 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js?v=202610071200";
-import { icon as I, hasIcon } from "./icons.js?v=202610071200";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js?v=202610071500";
+import { icon as I, hasIcon } from "./icons.js?v=202610071500";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -199,7 +199,7 @@ function panel(ic, title, body, right = "", flush = false) {
   return `<section class="panel"><div class="ph">${I(ic, 15)}<h3>${title}</h3><span class="spacer"></span>${right}</div><div class="pb ${flush ? "flush" : ""}">${body}</div></section>`;
 }
 
-// ===== 流程圖：上方是標準流程，下方每張進行中的提案一條泳道，標出它走到哪 =====
+// ===== 流程圖：上方是兩條標準流程（企劃提案、技術提案），下方每張進行中的提案一條泳道，標出它走到哪 =====
 const STAGES = [
   { n: 1, label: "需求", sub: "回饋／需求" },
   { n: 2, label: "寫提案", sub: "propose" },
@@ -213,6 +213,7 @@ const STAGES = [
 // 提案目前在第幾格（1～8）
 const stageOf = c => c.archived ? 8 : c.status === "待驗收" ? 6 : c.status === "製作中" || c.status === "已同意" ? 4 : c.status === "待同意" ? 3 : 2;
 const STAGE_HINT = { 3: "等同意", 4: "AI 製作中", 6: "試玩後說「驗收通過」", 8: "已完成" };
+const STAGE_HINT_TECH = { 3: "等程式同意", 4: "AI 製作中", 6: "等程式審查 PR", 8: "已完成" };
 function flowDiagram() {
   const d = S.data, act = d.changes.filter(c => !c.archived).sort((a, b) => stageOf(b) - stageOf(a));
   const arc = d.changes.filter(c => c.archived);
@@ -225,10 +226,10 @@ function flowDiagram() {
   h += `<div style="grid-column:1;grid-row:${r}"></div>` + STAGES.map(s => `<div class="head" style="grid-column:${s.n + 1};grid-row:${r}"><span class="num">${s.n}</span><b>${s.label}</b><small>${s.sub}</small></div>`).join("");
   // 標準流程（範本泳道）
   r++;
-  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill brand">${I("workflow", 15)}標準流程</span></div>`;
+  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill brand" title="玩家看得到的改變：玩法、畫面、數值、文字">${I("fileText", 15)}企劃提案</span></div>`;
   h += at(1, r, node("t1", "lightbulb", "提需求／回饋", "管理台、GitHub"));
   h += at(2, r, node("t2", "fileText", "AI 寫提案", "/spectra-propose", "spectra cmd"));
-  h += at(3, r, node("t3", "thumbsUp", "同意", "企劃提案：企劃・技術提案：程式"));
+  h += at(3, r, node("t3", "thumbsUp", "企劃同意", "討論串勾選、管理台、對話"));
   h += at(4, r, node("t4", "code", "AI 製作", "先寫測試再做・/spectra-apply", "spectra cmd"));
   h += at(5, r, node("t5", "help", "需求有變？", "製作中被要求調整"));
   h += at(6, r, node("t6", "flask", "試玩驗收", "說「驗收通過」・/spectra-verify", "spectra"));
@@ -237,6 +238,17 @@ function flowDiagram() {
   r++;
   h += at(2, r, node("t2b", "discuss", "先討論", "需求不清楚時・/spectra-discuss", "spectra cmd ghost"), "cell");
   h += at(5, r, node("t5b", "ingest", "改提案、重新同意", "/spectra-ingest", "spectra cmd"), "cell");
+  // 技術提案：程式同意、在分支做、開 PR 給程式審查，合併才上線
+  r++;
+  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill tech" title="玩家看不到的改變：重構、效能、工具、測試；不改規則書">${I("code", 15)}技術提案</span></div>`;
+  h += at(1, r, node("k1", "wrench", "程式提出", "重構、效能、工具、測試", "tech"));
+  h += at(2, r, node("k2", "fileText", "AI 寫技術提案", "類型：技術", "tech"));
+  h += at(3, r, node("k3", "thumbsUp", "程式同意", "勾「程式同意」", "tech"));
+  h += at(4, r, node("k4", "code", "AI 在分支製作", "tech/名稱・先寫測試", "tech"));
+  h += at(5, r, node("k5", "gitPr", "開 PR", "GitHub 自動跑測試", "tech"));
+  h += at(6, r, node("k6", "users", "程式審查", "要求修改 → AI 改", "tech"));
+  h += at(7, r, node("k7", "checkCircle", "合併", "不改規則書", "tech"));
+  h += at(8, r, node("k8", "rocket", "上線", "部署、通知", "tech"));
   // 每張進行中的提案
   r++;
   h += `<div class="lane-title" style="grid-row:${r}">進行中的提案（${act.length}）</div>`;
@@ -245,11 +257,11 @@ function flowDiagram() {
     r++;
     const st = stageOf(c);
     lanes.push({ id: c.id, row: r, st });
-    h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><button class="pill change" data-change="${esc(c.id)}"><span>${esc(short(c.title, 18))}</span><small>${esc(c.id)}</small></button></div>`;
+    h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><button class="pill change${c.kind === "技術" ? " is-tech" : ""}" data-change="${esc(c.id)}"><span>${esc(short(c.title, 18))}</span><small>${c.kind === "技術" ? "技術・" : ""}${esc(c.id)}</small></button></div>`;
     for (const s of STAGES) {
       if (s.n === 5) { h += at(5, r, `<span data-node="${c.id}:5" class="node todo" style="opacity:.35"></span>`, "cell small"); continue; }
       if (s.n < st) h += at(s.n, r, `<div class="node done" data-node="${c.id}:${s.n}" title="${s.label}：完成">${I("check", 16)}</div>`, "cell small");
-      else if (s.n === st) h += at(s.n, r, `<div class="node current" data-node="${c.id}:${s.n}" data-change="${esc(c.id)}">${I(st === 3 ? "thumbsUp" : st === 4 ? "code" : st === 6 ? "flask" : "fileText", 18)}<b>${esc(STAGE_HINT[st] || s.label)}</b><small>${st === 4 ? `任務 ${c.tasks.done}/${c.tasks.total}` : esc(c.status)}</small></div>`, "cell small");
+      else if (s.n === st) h += at(s.n, r, `<div class="node current${c.kind === "技術" ? " tech" : ""}" data-node="${c.id}:${s.n}" data-change="${esc(c.id)}">${I(st === 3 ? "thumbsUp" : st === 4 ? "code" : st === 6 ? "flask" : "fileText", 18)}<b>${esc((c.kind === "技術" ? STAGE_HINT_TECH : STAGE_HINT)[st] || s.label)}</b><small>${st === 4 ? `任務 ${c.tasks.done}/${c.tasks.total}` : esc(c.status)}</small></div>`, "cell small");
       else h += at(s.n, r, `<span class="node todo" data-node="${c.id}:${s.n}"></span>`, "cell small");
     }
   }
@@ -272,10 +284,11 @@ function drawFlowLinks(lanes) {
   const hline = (a, b, cls = "") => { const A = pos(a), B = pos(b); if (A && B) paths.push(`<path class="${cls}" d="M${A.r} ${A.cy} H${B.l}"/>`); };
   // 標準流程主線
   ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8"].reduce((p, c) => (hline(p, c, "on"), c));
+  ["k1", "k2", "k3", "k4", "k5", "k6", "k7", "k8"].reduce((p, c) => (hline(p, c, "tech"), c));
   // discuss → propose（從下方繞上來）
   const dA = pos("t2b"), dB = pos("t2");
   if (dA && dB) paths.push(`<path class="on dash" d="M${dA.cx} ${dA.t} V${dB.b}"/>`);
-  // 調整？→ 是 → ingest → 回到「企劃同意」
+  // 調整？→ 是 → ingest → 回到「企劃同意」（技術提案的「改提案」也一樣回到程式同意）
   const a5 = pos("t5"), b5 = pos("t5b"), a3 = pos("t3");
   if (a5 && b5 && a3) {
     paths.push(`<path class="on" d="M${a5.cx} ${a5.b} V${b5.t}"/>`);
@@ -325,7 +338,7 @@ V.flow = () => {
   const { html, lanes } = flowDiagram();
   flowLanes = lanes;
   setTimeout(() => drawFlowLinks(lanes), 0);
-  return vh("workflow", "流程圖", "上方是標準流程；下方每張進行中的提案一條泳道，亮色格子＝目前在這一步", seg) + html +
+  return vh("workflow", "流程圖", "上方是兩條標準流程（企劃提案、技術提案）；下方每張進行中的提案一條泳道，亮色格子＝目前在這一步", seg) + html +
     `<div class="legend"><span><span class="node done" style="width:16px;height:16px">${I("check", 10)}</span>完成</span><span><span class="lg" style="background:var(--accent);border-color:var(--accent)"></span>目前這一步（點開看明細）</span><span><span class="node todo"></span>還沒到</span><span><span class="lg" style="background:var(--accent-soft);border-color:var(--accent-line)"></span>Spectra 指令（AI 執行）</span></div>`;
 };
 V.tree = () => { S.flowMode = "tree"; S.view = "flow"; return V.flow(); };
@@ -442,7 +455,7 @@ const GLOSSARY = [
 V.help = () => vh("help", "說明") + `<div class="grid2" style="margin-top:0"><div class="card md">
   <h2>這是什麼</h2><p>專案的管理台：所有專案、每張提案的進度、規則書、劇本與角色等企劃內容、素材都在這裡。首頁會依你的角色列出「我的待辦」。</p>
   <h2>不登入也能用</h2><p>按「同意」「寫回饋」「編輯」「上傳」時，會打開已經填好的 GitHub 網頁，在那裡按一下送出就完成——只要你的瀏覽器有登入 github.com（手機可以用 GitHub App）。想留在管理台裡直接送出、附截圖，再到右上角「登入」設定登入碼。</p>
-  <h2>流程圖</h2><p>上方是<b>標準流程</b>（每張提案都會走過的 8 步）；下方每張<b>進行中的提案</b>一條泳道：綠色勾＝走過、亮色格子＝目前在這一步（點開看明細）、空心點＝還沒到。右上角可以切到「結構樹」看每一份文件與任務。</p>
+  <h2>流程圖</h2><p>上方是兩條<b>標準流程</b>：<b>企劃提案</b>（玩法、畫面、數值；企劃同意、試玩驗收）與<b>技術提案</b>（重構、效能、工具；程式同意、開 PR 給程式審查、合併才上線）；下方每張<b>進行中的提案</b>一條泳道：綠色勾＝走過、亮色格子＝目前在這一步（點開看明細）、空心點＝還沒到。右上角可以切到「結構樹」看每一份文件與任務。</p>
   <h2>同意提案</h2><p>在首頁或提案明細按「同意」；也可以在 GitHub 討論串勾 ☐ 企劃同意、Spectra 桌面版勾任務 0.1、Notion 改「同意」，或對 AI 說「同意 xxx」。</p>
   <h2>AI 怎麼配合管理台</h2><p>管理台是給人<b>看進度、做決定</b>的地方（同意、回饋、編輯）；<b>叫 AI 做事一律在 Claude 裡下指令</b>。需要 AI 的地方會有「對 AI 說…」按鈕：按一下複製指令，貼到 Claude 就好。AI 寫好的提案、做完的任務、處理過的回饋，推上 GitHub 後約 1 分鐘就會出現在管理台。</p>
   <h2>內容庫與素材庫</h2><p>劇本、角色、世界觀、名詞、數值、規劃書。每份文件右上角有「編輯」，分類頁有「新文件」；素材庫可以上傳。</p>
@@ -859,7 +872,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610071200"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610071500"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}
