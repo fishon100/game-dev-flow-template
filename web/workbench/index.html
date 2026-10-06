@@ -15,21 +15,21 @@
   --bg: #f6f5fb; --card: #ffffff; --ink: #1d1b29; --muted: #6b6880; --line: #e6e3f0;
   --brand: #0b6e83; --brand-ink: #ffffff; --brand-soft: #e2f1f4;
   --ok: #138a4b; --ok-soft: #e3f6ec; --warn: #b26a00; --warn-soft: #fff3dc; --bad: #c62828; --bad-soft: #fde8e8;
-  --info: #1f6feb; --info-soft: #e6f0ff; --shadow: 0 1px 2px rgb(20 10 60 / .06), 0 4px 16px rgb(20 10 60 / .05);
+  --info: #1f6feb; --info-soft: #e6f0ff; --violet: #6d28d9; --violet-soft: #efe9fb; --shadow: 0 1px 2px rgb(20 10 60 / .06), 0 4px 16px rgb(20 10 60 / .05);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #12111a; --card: #1c1a28; --ink: #ecebf5; --muted: #a29fb8; --line: #2e2b40;
     --brand: #4db6ca; --brand-ink: #061115; --brand-soft: #11313a;
     --ok: #4cd391; --ok-soft: #173326; --warn: #ffb547; --warn-soft: #3a2b12; --bad: #ff7676; --bad-soft: #3d1a1d;
-    --info: #79a8ff; --info-soft: #172640; --shadow: none;
+    --info: #79a8ff; --info-soft: #172640; --violet: #b49cf7; --violet-soft: #231c38; --shadow: none;
   }
 }
 :root[data-theme="dark"] {
   --bg: #12111a; --card: #1c1a28; --ink: #ecebf5; --muted: #a29fb8; --line: #2e2b40;
   --brand: #4db6ca; --brand-ink: #061115; --brand-soft: #11313a;
   --ok: #4cd391; --ok-soft: #173326; --warn: #ffb547; --warn-soft: #3a2b12; --bad: #ff7676; --bad-soft: #3d1a1d;
-  --info: #79a8ff; --info-soft: #172640; --shadow: none;
+  --info: #79a8ff; --info-soft: #172640; --violet: #b49cf7; --violet-soft: #231c38; --shadow: none;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -58,6 +58,7 @@ h2 small { font-weight: 400; color: var(--muted); font-size: 13px; }
 .btn.ok { background: var(--ok); color: #fff; border-color: var(--ok); }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.c-tech { background: var(--violet-soft); color: var(--violet); }
 .s-待同意 { background: var(--warn-soft); color: var(--warn); }
 .s-已同意, .s-製作中 { background: var(--info-soft); color: var(--info); }
 .s-待驗收 { background: var(--brand-soft); color: var(--brand); }
@@ -196,7 +197,7 @@ button.btn { font: inherit; cursor: pointer; }
       <ol>
         <li>首頁「需要你處理」→ 點提案的 <b>看內容並同意</b></li>
         <li>會打開 GitHub：讀「為什麼、改什麼、需要企劃確認的事」</li>
-        <li>沒問題就勾 <b>☐ 企劃同意</b>（GitHub App 或網頁都能勾）；有意見就在下面留言</li>
+        <li>沒問題就勾 <b>☐ 企劃同意</b>（技術提案是 <b>☐ 程式同意</b>，GitHub App 或網頁都能勾）；有意見就在下面留言</li>
         <li>約 1 分鐘後，工作台會顯示「已同意」，AI 就能開始做</li>
       </ol>
       <p class="muted">其他同意方式也算：Spectra 桌面版勾任務 0.1、Notion 卡片改「同意」後對 AI 說「看提案」、或直接對 AI 說「同意 xxx」。</p>
@@ -219,7 +220,7 @@ button.btn { font: inherit; cursor: pointer; }
       </ul>
       <h3>狀態是什麼意思</h3>
       <ul>
-        <li><span class="chip s-待同意">待同意</span> AI 寫好提案，等企劃看過同意</li>
+        <li><span class="chip s-待同意">待同意</span> AI 寫好提案，等企劃看過同意（<span class="chip c-tech">技術</span> 提案由程式同意，做完開 PR 給程式審查）</li>
         <li><span class="chip s-已同意">已同意</span> 可以開始做了：對 AI 說「做 xxx」</li>
         <li><span class="chip s-製作中">製作中</span> AI 正在照任務清單做，進度條是完成的任務數</li>
         <li><span class="chip s-待驗收">待驗收</span> 任務都做完、已上線：請試玩，沒問題就說「xxx 驗收通過」</li>
@@ -301,7 +302,7 @@ import { icon as I } from "../console/icons.js?v=202610062100";
     const files = `${repoUrl}/tree/main/${window.__data.specDir}/changes/${encodeURIComponent(c.folder)}`;
     const approve = c.status === "待同意" && c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">${I("thumbsUp", 16)}看內容並同意</a>` : "";
     return `<article class="card">
-      <div class="row"><span class="chip s-${esc(c.status)}">${esc(c.status)}</span>${c.breaking ? '<span class="chip lv-red">BREAKING</span>' : ""}<span class="muted">${esc(c.id)}</span></div>
+      <div class="row"><span class="chip s-${esc(c.status)}">${esc(c.status)}</span>${c.kind === "技術" ? '<span class="chip c-tech">技術</span>' : ""}${c.breaking ? '<span class="chip lv-red">BREAKING</span>' : ""}<span class="muted">${esc(c.id)}</span></div>
       <div class="title">${esc(c.title)}</div>
       ${compact ? "" : `<div class="why">${esc(short(c.why, 160))}</div>`}
       ${c.status === "待同意" && c.confirm ? `<div class="ask">${esc(short(c.confirm, 220))}</div>` : ""}
@@ -339,14 +340,16 @@ import { icon as I } from "../console/icons.js?v=202610062100";
     const hbtn = (href, label) => `<a class="btn hbtn" href="${esc(href)}" target="_blank" rel="noopener">${label}</a>`;
     const hsay = text => `<button class="btn hbtn" data-say="${esc(text)}" title="複製這句話，貼到 Claude">${I("message", 14)}複製指令</button>`;
     if (is("企劃")) {
-      waiting.forEach(c => item(esc(c.title), "等你同意", c.issue ? hbtn(c.issue.url, "看內容並同意") : ""));
-      toClose.forEach(c => item(esc(c.title), `做完了：試玩後對 AI 說「${esc(c.id)} 驗收通過」`, hsay(`${c.id} 驗收通過`)));
+      waiting.filter(c => c.kind !== "技術").forEach(c => item(esc(c.title), "等你同意", c.issue ? hbtn(c.issue.url, "看內容並同意") : ""));
+      toClose.filter(c => c.kind !== "技術").forEach(c => item(esc(c.title), `做完了：試玩後對 AI 說「${esc(c.id)} 驗收通過」`, hsay(`${c.id} 驗收通過`)));
       if (fbOpen.length + rqOpen.length) item(`${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, `對 AI 說「${fbOpen.length ? "看回饋" : "看需求"}」整理成提案`, hsay(fbOpen.length ? "看回饋" : "看需求"));
     }
     if (is("程式")) {
+      waiting.filter(c => c.kind === "技術").forEach(c => item(`${esc(c.title)} <span class="chip c-tech">技術</span>`, "技術提案，等你（程式）同意", c.issue ? hbtn(c.issue.url, "看內容並同意") : ""));
+      toClose.filter(c => c.kind === "技術").forEach(c => item(esc(c.title), `技術提案做完了：確認後對 AI 說「${esc(c.id)} 驗收通過」`, hsay(`${c.id} 驗收通過`)));
       (d.pulls || []).forEach(p => item(`審查 PR #${p.number} ${esc(p.title)}`, `${esc(p.user || "")}・${ago(p.created)}`, hbtn(p.url, "審查")));
       if (lastRun && lastRun.conclusion === "failure") item(`最近一次「${esc(lastRun.name)}」失敗`, esc(lastRun.title || ""), hbtn(lastRun.url, "看原因"));
-      active.filter(c => c.status === "已同意").forEach(c => item(esc(c.title), `企劃已同意：對 AI 說「做 ${esc(c.id)}」`, hsay(`做 ${c.id}`)));
+      active.filter(c => c.status === "已同意").forEach(c => item(esc(c.title), `${c.kind === "技術" ? "程式" : "企劃"}已同意：對 AI 說「做 ${esc(c.id)}」`, hsay(`做 ${c.id}`)));
     }
     for (const x of ["企劃", "美術", "程式", "劇本／數值"]) if (is(x)) for (const c of active) for (const g of c.tasks.groups || []) for (const it of g.items) if (!it.done && ROLE_TAG[x].test(it.text)) item(esc(it.text), `提案：${esc(c.title)}`);
     if (is("美術")) { if (!assetTodo) loadAssetTodo(d); else if (assetTodo.n) item(`${assetTodo.n} 個素材待製作或要修改`, "素材清單（素材.csv），在電腦版管理台的素材庫看細節"); }

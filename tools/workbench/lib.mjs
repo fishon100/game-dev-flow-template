@@ -5,7 +5,9 @@ import { join } from "node:path";
 export const APPROVAL_RE = /^- \[( |x|X)\] 0\.1 .*$/m;
 export const ISSUE_MARKER = name => `<!-- spectra-change: ${name} -->`;
 export const ISSUE_MARKER_RE = /<!-- spectra-change: ([a-z0-9][a-z0-9-]*) -->/;
-export const ISSUE_APPROVE_RE = /^- \[( |x|X)\] 企劃同意/m;
+export const ISSUE_APPROVE_RE = /^- \[( |x|X)\] (企劃|程式)同意/m;   // 企劃提案＝企劃同意、技術提案＝程式同意
+/** 提案類型 → 誰同意 */
+export const approverOf = kind => (kind === "技術" ? "程式" : "企劃");
 
 const read = f => (existsSync(f) ? readFileSync(f, "utf8").replace(/\r/g, "") : "");
 
@@ -62,8 +64,10 @@ export function parseProposal(md, fallbackName) {
     title,
     why,
     what: pick(/^(What Changes|改什麼|Proposed Solution)/i),
-    confirm: pick(/企劃.*確認|需要確認|Open Questions/i),
+    confirm: pick(/(企劃|程式).*確認|需要確認|Open Questions/i),
     breaking: /\*\*BREAKING\*\*/.test(md),
+    // 類型：企劃（改玩法、規則書，企劃同意）／技術（重構、效能、工具，不改規則書，程式同意、要程式審查）
+    kind: /類型[：:]\s*技術/.test(md) ? "技術" : "企劃",
   };
 }
 
@@ -118,12 +122,13 @@ export function approvalIssueBody(c, repoUrl, specDir = "docs/spectra") {
     `### 改什麼`,
     cut(c.what || "（proposal.md 沒有寫）", 1500),
     ``,
-    c.confirm ? `### ❓ 需要企劃確認的事\n${cut(c.confirm, 1200)}\n` : "",
+    c.kind === "技術" ? `> 🔧 **技術提案**：不改玩法和規則書，由**程式**同意；做完開 PR，程式審查合併後才上線。\n` : "",
+    c.confirm ? `### ❓ 需要${approverOf(c.kind)}確認的事\n${cut(c.confirm, 1200)}\n` : "",
     c.breaking ? `> ⚠️ 這張提案有 **BREAKING**：會拿掉或改變玩家已經習慣的東西。\n` : "",
     `---`,
     `**看完沒問題就勾下面這格**（手機 GitHub App 也可以勾）。勾完幾十秒後，提案的任務 0.1 會自動打勾，對 AI 說「做 ${c.id}」就會開始製作。`,
     ``,
-    `- [ ] 企劃同意`,
+    `- [ ] ${approverOf(c.kind)}同意`,
     ``,
     `有意見？直接在下面留言，再對 AI 說「看提案」，AI 會照意見修改提案。`,
     `完整內容：${link}`,

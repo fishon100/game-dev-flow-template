@@ -1,8 +1,8 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js?v=202610062100";
-import { icon as I, hasIcon } from "./icons.js?v=202610062100";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js?v=202610071200";
+import { icon as I, hasIcon } from "./icons.js?v=202610071200";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -69,6 +69,9 @@ function sideHtml() {
 // ---------- 共用元件 ----------
 const issueBtns = primary => `<button class="btn ${primary ? "primary" : ""}" data-newissue="回饋">${I("gamepad")}寫回饋</button><button class="btn" data-newissue="需求">${I("lightbulb")}提需求</button>`;
 const chip = s => `<span class="chip s-${esc(s)}">${esc(s)}</span>`;
+// 技術提案（重構、效能、工具；程式同意、程式審查）的標記；誰同意
+const kindChip = c => c.kind === "技術" ? `<span class="chip c-tech" title="技術提案：程式同意，做完開 PR 給程式審查">${I("code", 12)}技術</span>` : "";
+const approverOf = c => (c.kind === "技術" ? "程式" : "企劃");
 const pct = c => (c.tasks.total ? Math.round((c.tasks.done / c.tasks.total) * 100) : c.archived ? 100 : 0);
 const barHtml = c => `<div class="bar" title="${c.tasks.done}/${c.tasks.total}"><i style="width:${pct(c)}%"></i></div>`;
 const ORDER = { 待同意: 0, 待驗收: 1, 製作中: 2, 已同意: 3, 已完成: 9 };
@@ -87,7 +90,7 @@ function changeDetail(c) {
   const folder = `${S.data.specDir}/changes/${c.archived ? "archive/" : ""}${c.folder}`;
   const groups = taskTree(c.tasks.groups, true);
   return `<button class="ibtn close" data-close aria-label="關閉">${I("x")}</button>
-    <div class="row">${chip(c.status)}${c.breaking ? '<span class="chip c-bad">BREAKING</span>' : ""}<span class="muted" style="font-family:var(--mono)">${esc(c.id)}${c.date ? "・" + esc(c.date) : ""}</span></div>
+    <div class="row">${chip(c.status)}${kindChip(c)}${c.breaking ? '<span class="chip c-bad">BREAKING</span>' : ""}<span class="muted" style="font-family:var(--mono)">${esc(c.id)}${c.date ? "・" + esc(c.date) : ""}</span></div>
     <h2 style="margin:10px 0 0;font-size:18px;font-weight:650">${esc(c.title)}</h2>
     ${chainHtml(c)}
     <div class="row" style="margin-bottom:14px">
@@ -160,14 +163,16 @@ function myTodo(role) {
   const items = [], add = (key, html) => { if (!items.some(x => x.key === key)) items.push({ key, html }); };
   const is = (...r) => role === "全部" || r.includes(role);
   if (is("企劃")) {
-    by("待同意").forEach(c => add("ap:" + c.id, todoLi("", esc(c.title), `等企劃同意・${esc(c.id)}`, approveBtn(c, `${I("thumbsUp", 14)}同意`) + detailBtn(c))));
-    by("待驗收").forEach(c => add("vf:" + c.id, todoLi("info", esc(c.title), "做完了：請試玩，沒問題就跟 AI 說驗收通過", sayBtn(`${c.id} 驗收通過`) + detailBtn(c))));
+    by("待同意").filter(c => c.kind !== "技術").forEach(c => add("ap:" + c.id, todoLi("", esc(c.title), `等企劃同意・${esc(c.id)}`, approveBtn(c, `${I("thumbsUp", 14)}同意`) + detailBtn(c))));
+    by("待驗收").filter(c => c.kind !== "技術").forEach(c => add("vf:" + c.id, todoLi("info", esc(c.title), "做完了：請試玩，沒問題就跟 AI 說驗收通過", sayBtn(`${c.id} 驗收通過`) + detailBtn(c))));
     if (fbOpen.length + rqOpen.length) add("fb", todoLi("bad", `${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, "看過後請 AI 整理成提案", sayBtn(fbOpen.length ? "看回饋" : "看需求") + `<button class="btn sm" data-go="issues">查看</button>`));
   }
   if (is("程式")) {
+    by("待同意").filter(c => c.kind === "技術").forEach(c => add("ap:" + c.id, todoLi("", `${esc(c.title)} ${kindChip(c)}`, `技術提案，等程式同意・${esc(c.id)}`, approveBtn(c, `${I("thumbsUp", 14)}同意`) + detailBtn(c))));
     (d.pulls || []).forEach(p => add("pr:" + p.number, todoLi("info", `審查 PR #${p.number} ${esc(p.title)}`, `${esc(p.user || "")}・${ago(p.created)}${p.draft ? "・草稿" : ""}`, `<a class="btn sm" href="${esc(p.url)}" target="_blank" rel="noopener">審查</a>`)));
     if (d.runs[0]?.conclusion === "failure") add("run", todoLi("bad", `最近一次「${esc(d.runs[0].name)}」失敗`, esc(d.runs[0].title || ""), `<a class="btn sm" href="${esc(d.runs[0].url)}" target="_blank" rel="noopener">看原因</a>`));
-    by("已同意").forEach(c => add("go:" + c.id, todoLi("", esc(c.title), "企劃已同意，還沒開始做", sayBtn(`做 ${c.id}`) + detailBtn(c))));
+    by("待驗收").filter(c => c.kind === "技術").forEach(c => add("vf:" + c.id, todoLi("info", `${esc(c.title)} ${kindChip(c)}`, "技術提案做完了：PR 合併、測試通過後跟 AI 說驗收通過", sayBtn(`${c.id} 驗收通過`) + detailBtn(c))));
+    by("已同意").forEach(c => add("go:" + c.id, todoLi("", esc(c.title), `${approverOf(c)}已同意，還沒開始做`, sayBtn(`做 ${c.id}`) + detailBtn(c))));
   }
   for (const r of ["企劃", "美術", "程式", "劇本／數值"]) if (is(r)) roleTasks(r).forEach(({ c, text }) => add("t:" + c.id + text, todoLi("warn", esc(text), `提案：${esc(c.title)}`, detailBtn(c))));
   if (is("美術") && S.assetTodo?.repo === S.repo && S.assetTodo.n) add("assets", todoLi("warn", `${S.assetTodo.n} 個素材待製作或要修改`, "素材清單（素材.csv）", `<button class="btn sm" data-go="assets">素材庫</button>`));
@@ -198,7 +203,7 @@ function panel(ic, title, body, right = "", flush = false) {
 const STAGES = [
   { n: 1, label: "需求", sub: "回饋／需求" },
   { n: 2, label: "寫提案", sub: "propose" },
-  { n: 3, label: "企劃同意", sub: "任務 0.1" },
+  { n: 3, label: "同意", sub: "企劃／程式" },
   { n: 4, label: "製作", sub: "apply" },
   { n: 5, label: "調整？", sub: "ingest" },
   { n: 6, label: "試玩驗收", sub: "verify" },
@@ -207,7 +212,7 @@ const STAGES = [
 ];
 // 提案目前在第幾格（1～8）
 const stageOf = c => c.archived ? 8 : c.status === "待驗收" ? 6 : c.status === "製作中" || c.status === "已同意" ? 4 : c.status === "待同意" ? 3 : 2;
-const STAGE_HINT = { 3: "等企劃同意", 4: "AI 製作中", 6: "試玩後說「驗收通過」", 8: "已完成" };
+const STAGE_HINT = { 3: "等同意", 4: "AI 製作中", 6: "試玩後說「驗收通過」", 8: "已完成" };
 function flowDiagram() {
   const d = S.data, act = d.changes.filter(c => !c.archived).sort((a, b) => stageOf(b) - stageOf(a));
   const arc = d.changes.filter(c => c.archived);
@@ -223,7 +228,7 @@ function flowDiagram() {
   h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill brand">${I("workflow", 15)}標準流程</span></div>`;
   h += at(1, r, node("t1", "lightbulb", "提需求／回饋", "管理台、GitHub"));
   h += at(2, r, node("t2", "fileText", "AI 寫提案", "/spectra-propose", "spectra cmd"));
-  h += at(3, r, node("t3", "thumbsUp", "企劃同意", "任務 0.1"));
+  h += at(3, r, node("t3", "thumbsUp", "同意", "企劃提案：企劃・技術提案：程式"));
   h += at(4, r, node("t4", "code", "AI 製作", "先寫測試再做・/spectra-apply", "spectra cmd"));
   h += at(5, r, node("t5", "help", "需求有變？", "製作中被要求調整"));
   h += at(6, r, node("t6", "flask", "試玩驗收", "說「驗收通過」・/spectra-verify", "spectra"));
@@ -300,7 +305,7 @@ function flowTreeHtml() {
     const art = (ok, ic, label, extra = "") => `<li><div class="tnode"><span class="tw leaf"></span><span class="${ok ? "ck" : "ck-no"}">${I(ok ? "checkCircle" : "circle", 15)}</span>${I(ic, 14)}<span class="lbl">${label}</span>${extra}</div></li>`;
     return `<li class="${c.archived ? "closed" : ""}"><div class="tnode clickable" data-change="${esc(c.id)}"><button class="tw">${I("chevronDown", 14)}</button>${chip(c.status)}<span class="lbl"><b>${esc(c.title)}</b> <span class="muted">${esc(c.id)}</span></span><span class="meta">${barHtml(c)}<span class="muted">${t.done}/${t.total}</span></span></div>
       <ul>${art(a.proposal, "fileText", "說明 proposal")}${art(a.specs, "scroll", "規則差異", c.capabilities?.length ? `<span class="meta muted">${esc(c.capabilities.join("、"))}</span>` : "")}${art(a.design, "wrench", "設計 design")}
-      ${art(c.archived || t.approved, "thumbsUp", "企劃同意", t.approvalNote ? `<span class="meta muted">${esc(short(t.approvalNote, 30))}</span>` : "")}
+      ${art(c.archived || t.approved, "thumbsUp", `${approverOf(c)}同意`, t.approvalNote ? `<span class="meta muted">${esc(short(t.approvalNote, 30))}</span>` : "")}
       <li class="${c.archived ? "closed" : ""}"><div class="tnode"><button class="tw">${I("chevronDown", 14)}</button>${I("list", 14)}<span class="lbl">任務 tasks</span><span class="meta muted">${t.done}/${t.total}</span></div><ul>${taskTree(t.groups, false)}</ul></li></ul></li>`;
   };
   const issues = (list, ic, label) => `<li class="closed"><div class="tnode"><button class="tw">${I("chevronDown", 14)}</button>${I(ic, 14)}<span class="lbl"><b>${label}</b></span><span class="meta muted">${list.length}</span></div><ul>${list.map(i => `<li><div class="tnode"><span class="tw leaf"></span><a class="lbl" href="${esc(i.url)}" target="_blank" rel="noopener">#${i.number} ${esc(i.title)}</a></div></li>`).join("") || `<li><div class="tnode muted"><span class="tw leaf"></span>沒有</div></li>`}</ul></li>`;
@@ -329,7 +334,7 @@ V.changes = () => {
   const d = S.data, list = [...d.changes].sort((a, b) => (ORDER[a.status] - ORDER[b.status]) || b.folder.localeCompare(a.folder));
   return vh("list", "提案", "點一列看明細與進度鏈") +
     `<div class="tablewrap"><table class="t stack"><thead><tr><th>狀態</th><th>提案</th><th>進度</th><th>同意</th><th>日期</th></tr></thead><tbody>
-    ${list.map(c => `<tr class="click ${S.sel === c.id ? "sel" : ""}" data-change="${esc(c.id)}"><td>${chip(c.status)}</td><td><div style="font-weight:600">${esc(c.title)}</div><div class="muted" style="font-family:var(--mono)">${esc(c.id)}</div></td><td style="min-width:130px">${barHtml(c)}<div class="muted">${c.tasks.done}/${c.tasks.total}</div></td><td>${c.archived || c.tasks.approved ? `<span class="ck">${I("checkCircle", 16)}</span>` : `<span class="ck-no">${I("circle", 16)}</span>`}</td><td class="muted">${esc(c.date || "進行中")}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">還沒有提案</td></tr>`}
+    ${list.map(c => `<tr class="click ${S.sel === c.id ? "sel" : ""}" data-change="${esc(c.id)}"><td>${chip(c.status)}</td><td><div style="font-weight:600">${esc(c.title)} ${kindChip(c)}</div><div class="muted" style="font-family:var(--mono)">${esc(c.id)}</div></td><td style="min-width:130px">${barHtml(c)}<div class="muted">${c.tasks.done}/${c.tasks.total}</div></td><td>${c.archived || c.tasks.approved ? `<span class="ck">${I("checkCircle", 16)}</span>` : `<span class="ck-no">${I("circle", 16)}</span>`}</td><td class="muted">${esc(c.date || "進行中")}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">還沒有提案</td></tr>`}
     </tbody></table></div>`;
 };
 
@@ -423,7 +428,8 @@ const GLOSSARY = [
   ["提案", "AI 寫的「要改什麼、為什麼」，企劃同意後才會做。一張提案包含說明、會改到的規則、設計、任務清單"],
   ["規則書", "遊戲「現在」的運作規則（也叫規格書）。只能透過提案改，每條規則都有自動測試"],
   ["規劃書", "企劃寫的想法與方向（企劃書），可以隨時改。想做的事要開提案才會進規則書"],
-  ["待同意", "提案寫好了，等企劃看過按同意"],
+  ["待同意", "提案寫好了，等企劃看過按同意（技術提案由程式同意）"],
+  ["技術提案", "程式提出的重構、效能、工具等改動，不改玩法和規則書。由程式同意，做完開 PR，程式審查合併後才上線"],
   ["已同意／製作中", "企劃同意了；AI 正在照任務清單做（進度條＝完成的任務）"],
   ["待驗收", "做完、已上線：請試玩，沒問題就說「xxx 驗收通過」"],
   ["已完成", "驗收通過，規則已併回規則書"],
@@ -604,7 +610,7 @@ function openWeb(url, msg) {
 function webApprove(id) {
   const c = S.data.changes.find(x => x.id === id); if (!c) return;
   if (!c.issue) { toast("這張提案的討論串還在建立中，約 1 分鐘後再試（或登入後直接同意）", 7000); return; }
-  openWeb(c.issue.url, "在 GitHub 頁面勾 ☐ 企劃同意 就完成了（約 1 分鐘後這裡會更新）");
+  openWeb(c.issue.url, `在 GitHub 頁面勾 ☐ ${approverOf(c)}同意 就完成了（約 1 分鐘後這裡會更新）`);
 }
 
 // 編輯中還沒存：離開前要確認
@@ -678,7 +684,7 @@ $("#loginBtn").addEventListener("click", loginFlow);
 
 async function doApprove(id) {
   const c = S.data.changes.find(x => x.id === id); if (!c) return;
-  const v = await dialog("同意提案", `${target()}<p>確定同意 <b>${esc(c.title)}</b>（${esc(c.id)}）？</p>${c.confirm ? `<div class="ask">${esc(c.confirm)}</div>` : ""}<p class="muted">同意後對 AI 說「做 ${esc(c.id)}」就會開始製作。如果還有疑問，請改用「留言」。</p>`, [["", "取消"], ["ok", "同意", "ok"]]);
+  const v = await dialog(c.kind === "技術" ? "同意技術提案（程式）" : "同意提案", `${target()}${c.kind === "技術" ? `<div class="banner">${I("code", 15)}<span>這是<b>技術提案</b>：由程式同意。做完會開 PR，程式審查合併後才上線。</span></div>` : ""}<p>確定同意 <b>${esc(c.title)}</b>（${esc(c.id)}）？</p>${c.confirm ? `<div class="ask">${esc(c.confirm)}</div>` : ""}<p class="muted">同意後對 AI 說「做 ${esc(c.id)}」就會開始製作。如果還有疑問，請改用「留言」。</p>`, [["", "取消"], ["ok", "同意", "ok"]]);
   if (v !== "ok") return;
   try {
     const how = await approveChange(S.repo, c, S.data.specDir, S.data.branch);
@@ -853,7 +859,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610062100"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610071200"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}

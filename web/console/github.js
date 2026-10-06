@@ -78,24 +78,24 @@ export async function uploadFile(repo, path, file, message, branch = "main") {
   throw new Error("同名檔案太多了，請換一個檔名");
 }
 
-const APPROVE_RE = /^- \[( |x|X)\] 企劃同意/m;
+const APPROVE_RE = /^- \[( |x|X)\] (企劃|程式)同意/m;   // 企劃提案＝企劃同意、技術提案＝程式同意
 const TASK_RE = /^- \[( |x|X)\] 0\.1 .*$/m;
 /** 同意提案：有 Issue 就在 Issue 上打勾（Actions 會寫回 tasks.md）；沒有 Issue 就直接改 tasks.md */
 export async function approveChange(repo, change, specDir, branch) {
-  const who = auth.user?.login || "管理台";
+  const who = auth.user?.login || "管理台", role = change.kind === "技術" ? "程式" : "企劃";
   if (change.issue?.number) {
     const issue = await gh(`/repos/${repo}/issues/${change.issue.number}`);
-    if (!APPROVE_RE.test(issue.body || "")) throw new Error("這個 Issue 裡找不到「企劃同意」勾選框");
-    if (/^- \[[xX]\] 企劃同意/m.test(issue.body)) return "already"; // 已經同意過（例如重新整理後又按一次）：不重複留言
-    await gh(`/repos/${repo}/issues/${change.issue.number}`, { method: "PATCH", body: { body: issue.body.replace(APPROVE_RE, "- [x] 企劃同意") } });
+    if (!APPROVE_RE.test(issue.body || "")) throw new Error("這個 Issue 裡找不到「同意」勾選框");
+    if (/^- \[[xX]\] (企劃|程式)同意/m.test(issue.body)) return "already"; // 已經同意過（例如重新整理後又按一次）：不重複留言
+    await gh(`/repos/${repo}/issues/${change.issue.number}`, { method: "PATCH", body: { body: issue.body.replace(APPROVE_RE, (m, x, r) => `- [x] ${r}同意`) } });
     await gh(`/repos/${repo}/issues/${change.issue.number}/comments`, { method: "POST", body: { body: `👍 ${who} 在管理台同意了這張提案。` } });
     return "issue";
   }
   const path = `${specDir}/changes/${change.folder}/tasks.md`;
   const { text, sha } = await readFile(repo, path, branch);
-  if (!TASK_RE.test(text)) throw new Error("tasks.md 沒有「0.1 企劃確認」這一項");
-  const next = text.replace(TASK_RE, line => /^- \[[xX]\]/.test(line) ? line : line.replace(/^- \[ \]/, "- [x]").replace(/\s*$/, `（企劃於管理台同意（${who}），${today()}）`));
-  await saveFile(repo, path, next, `企劃同意：${change.id}（管理台，${who}）`, sha, branch);
+  if (!TASK_RE.test(text)) throw new Error("tasks.md 沒有「0.1」確認這一項");
+  const next = text.replace(TASK_RE, line => /^- \[[xX]\]/.test(line) ? line : line.replace(/^- \[ \]/, "- [x]").replace(/\s*$/, `（${role}於管理台同意（${who}），${today()}）`));
+  await saveFile(repo, path, next, `${role}同意：${change.id}（管理台，${who}）`, sha, branch);
   return "tasks";
 }
 

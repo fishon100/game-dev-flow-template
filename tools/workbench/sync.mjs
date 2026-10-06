@@ -1,12 +1,12 @@
 // 工作台同步（GitHub Actions 執行；本機要跑需設 GITHUB_TOKEN、GITHUB_REPOSITORY）
-//  1. Issue 裡勾了「企劃同意」→ 把 tasks.md 的 0.1 打勾並註明來源（之後由 workflow commit）
+//  1. Issue 裡勾了「企劃同意」（技術提案是「程式同意」）→ 把 tasks.md 的 0.1 打勾並註明來源（之後由 workflow commit）
 //  2. 每張待同意的提案都有一個「提案」Issue（沒有就開，企劃在手機就能看、能勾）
 //  3. 已同意的 Issue 貼「已同意」標籤；已完成的提案把 Issue 關掉
 //  4. 產生工作台資料 workbench-out/data.json（由 workflow 推到 workbench-data 分支）
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { readSpectra, approveTasks, approvalIssueBody, indexContent, ISSUE_MARKER_RE, ISSUE_APPROVE_RE } from "./lib.mjs";
+import { readSpectra, approveTasks, approvalIssueBody, indexContent, approverOf, ISSUE_MARKER_RE, ISSUE_APPROVE_RE } from "./lib.mjs";
 
 const root = process.cwd();
 const repo = process.env.GITHUB_REPOSITORY;
@@ -27,7 +27,7 @@ async function gh(path, init = {}) {
 }
 const post = (p, body, method = "POST") => gh(p, { method, body: JSON.stringify(body) });
 
-const LABELS = { 提案: "5319e7", 已同意: "0e8a16", 需求: "1d76db", 回饋: "d93f0b" };
+const LABELS = { 提案: "5319e7", 技術: "6f42c1", 已同意: "0e8a16", 需求: "1d76db", 回饋: "d93f0b" };
 for (const [name, color] of Object.entries(LABELS)) await post("/labels", { name, color }); // 已存在會回 422，忽略
 
 // ---- 1. 同意：任何一個提案 Issue 勾了「企劃同意」，就把 tasks.md 0.1 打勾 ----
@@ -65,7 +65,7 @@ const changed = [];
 let { changes } = readSpectra(root, specDir);
 const hasLabel = (i, name) => i.labels?.some(l => (l.name || l) === name);
 const setBox = async (issue, checked) => {
-  issue.body = issue.body.replace(ISSUE_APPROVE_RE, `- [${checked ? "x" : " "}] 企劃同意`);
+  issue.body = issue.body.replace(ISSUE_APPROVE_RE, (m, x, who) => `- [${checked ? "x" : " "}] ${who}同意`);
   await post(`/issues/${issue.number}`, { body: issue.body }, "PATCH");
 };
 for (const issue of allIssues) {
@@ -82,21 +82,21 @@ for (const issue of allIssues) {
     continue;
   }
   if (hasLabel(issue, "已同意")) {
-    // 提案改過、0.1 被取消：請企劃重新確認
+    // 提案改過、0.1 被取消：請同意的人（企劃／程式）重新確認
     await setBox(issue, false);
     await gh(`/issues/${issue.number}/labels/${encodeURIComponent("已同意")}`, { method: "DELETE" }).catch(() => {});
     issue.labels = issue.labels.filter(l => (l.name || l) !== "已同意");
     await post(`/issues/${issue.number}`, { body: approvalIssueBody(c, repoUrl, specDir) }, "PATCH");
-    await post(`/issues/${issue.number}/comments`, { body: `🔄 提案 \`${c.id}\` 有修改，已把「企劃同意」取消。請看上面更新後的內容，沒問題再勾一次。` });
+    await post(`/issues/${issue.number}/comments`, { body: `🔄 提案 \`${c.id}\` 有修改，已把「${approverOf(c.kind)}同意」取消。請看上面更新後的內容，沒問題再勾一次。` });
     console.log(`重新確認：${c.id}（Issue #${issue.number}）`);
     continue;
   }
   if (!boxChecked) continue;
   const f = join(root, specDir, "changes", c.folder, "tasks.md");
-  writeFileSync(f, approveTasks(readFileSync(f, "utf8"), `企劃於 GitHub Issue #${issue.number} 同意，${today}`));
+  writeFileSync(f, approveTasks(readFileSync(f, "utf8"), `${approverOf(c.kind)}於 GitHub Issue #${issue.number} 同意，${today}`));
   changed.push(f);
   await post(`/issues/${issue.number}/labels`, { labels: ["已同意"] });
-  await post(`/issues/${issue.number}/comments`, { body: `✅ 已記錄企劃同意：提案 \`${c.id}\` 的任務 0.1 已打勾。對 AI 說「做 ${c.id}」就會開始製作。` });
+  await post(`/issues/${issue.number}/comments`, { body: `✅ 已記錄${approverOf(c.kind)}同意：提案 \`${c.id}\` 的任務 0.1 已打勾。對 AI 說「做 ${c.id}」就會開始製作。` });
   console.log(`同意：${c.id}（Issue #${issue.number}）`);
 }
 if (changed.length) ({ changes } = readSpectra(root, specDir));
@@ -106,7 +106,8 @@ const issueOf = id => allIssues.find(i => (i.body || "").match(ISSUE_MARKER_RE)?
 for (const c of changes) {
   let issue = issueOf(c.id);
   if (!c.archived && !issue) {
-    issue = await post("/issues", { title: `提案：${c.title}（${c.id}）`, body: approvalIssueBody(c, repoUrl, specDir), labels: ["提案"] });
+    const tech = c.kind === "技術";
+    issue = await post("/issues", { title: `${tech ? "技術提案" : "提案"}：${c.title}（${c.id}）`, body: approvalIssueBody(c, repoUrl, specDir), labels: tech ? ["提案", "技術"] : ["提案"] });
     allIssues.push(issue);
     console.log(`開 Issue #${issue.number}：${c.id}`);
   }

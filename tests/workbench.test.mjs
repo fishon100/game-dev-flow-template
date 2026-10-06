@@ -89,3 +89,15 @@ test("內容庫：列出文件與圖檔，Markdown 用第一個標題當名稱",
   const idx = indexContent(root);
   assert.deepEqual(idx.map(f => [f.path, f.ext, f.title]), [["docs/企劃/圖.png", "png", "圖"], ["docs/企劃/知識庫/角色/阿鰭.md", "md", "阿鰭（角色卡）"]]);
 });
+
+test("技術提案：類型讀得出來，討論串的勾選框是「程式同意」，勾了也辨認得出來", () => {
+  const p = parseProposal(`> 中文標題：物理迴圈改固定步長\n> 類型：技術\n\n## Why\n\n手機掉幀時球會穿牆。\n\n## 需要程式確認的事\n\n- 步長 1/120 秒\n`, "x");
+  assert.equal(p.kind, "技術");
+  assert.match(p.confirm, /1\/120/);   // 「需要程式確認的事」也讀得到
+  assert.equal(parseProposal("> 中文標題：加道具\n\n## Why\n\n想要。\n", "y").kind, "企劃");
+  const body = approvalIssueBody({ id: "fixed-step", folder: "fixed-step", why: "因為", what: "改", confirm: "", breaking: false, kind: "技術" }, "https://github.com/a/b");
+  assert.match(body, /^- \[ \] 程式同意$/m);
+  assert.match(body, /技術提案/);
+  assert.equal(body.match(ISSUE_APPROVE_RE)[2], "程式");
+  assert.equal(body.replace("- [ ] 程式同意", "- [x] 程式同意").match(ISSUE_APPROVE_RE)[1], "x");
+});

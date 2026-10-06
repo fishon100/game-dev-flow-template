@@ -18,10 +18,13 @@ const section = (title, lines) => { if (lines.length) out.push(`\n■ ${title}`,
 // 1. 提案
 const { changes } = readSpectra(root, cfg.spec_dir || "docs/spectra");
 const act = changes.filter(c => !c.archived), by = s => act.filter(c => c.status === s);
-section("等企劃同意的提案", by("待同意").map(c => `${c.title}（${c.id}）`));
-section("已同意、還沒開始做（可以直接做到上線）", by("已同意").map(c => { todo.push(`做 ${c.id}`); return `${c.title}（${c.id}）・${c.tasks.approvalNote || "已同意"}`; }));
-section("製作中", by("製作中").map(c => { todo.push(`繼續做 ${c.id}`); return `${c.title}（${c.id}）・任務 ${c.tasks.done}/${c.tasks.total}・下一步：${c.tasks.next}`; }));
-section("做完了，等企劃試玩驗收", by("待驗收").map(c => `${c.title}（${c.id}）→ 試玩後說「${c.id} 驗收通過」`));
+const tag = c => (c.kind === "技術" ? "【技術】" : "");
+section("等企劃同意的提案", by("待同意").filter(c => c.kind !== "技術").map(c => `${c.title}（${c.id}）`));
+section("等程式同意的技術提案", by("待同意").filter(c => c.kind === "技術").map(c => `${c.title}（${c.id}）`));
+section("已同意、還沒開始做（可以直接做到上線）", by("已同意").map(c => { todo.push(`做 ${c.id}`); return `${tag(c)}${c.title}（${c.id}）・${c.tasks.approvalNote || "已同意"}`; }));
+section("製作中", by("製作中").map(c => { todo.push(`繼續做 ${c.id}`); return `${tag(c)}${c.title}（${c.id}）・任務 ${c.tasks.done}/${c.tasks.total}・下一步：${c.tasks.next}`; }));
+section("做完了，等企劃試玩驗收", by("待驗收").filter(c => c.kind !== "技術").map(c => `${c.title}（${c.id}）→ 試玩後說「${c.id} 驗收通過」`));
+section("技術提案做完了，等程式確認", by("待驗收").filter(c => c.kind === "技術").map(c => `${c.title}（${c.id}）→ PR 合併、測試通過後說「${c.id} 驗收通過」`));
 
 // 2. GitHub 討論串：提案的新留言（最後一則是人留的）、還沒處理的回饋與需求
 const issues = json("gh issue list --state open --limit 100 --json number,title,labels,body,url") || [];
@@ -40,6 +43,11 @@ section("提案討論串有新留言（照留言改提案）", notes);
 const lab = (i, n) => (i.labels || []).some(l => l.name === n);
 section("還沒處理的回饋", issues.filter(i => lab(i, "回饋")).map(i => { todo.push(`把 #${i.number} 開成提案（或直接修）`); return `#${i.number} ${i.title}`; }));
 section("還沒處理的需求", issues.filter(i => lab(i, "需求")).map(i => { todo.push(`把 #${i.number} 開成提案`); return `#${i.number} ${i.title}`; }));
+
+// 2b. 等程式審查的 PR（技術提案做完開的 PR，或程式自己開的）
+const pulls = json("gh pr list --state open --limit 50 --json number,title,author,isDraft,headRefName,reviewDecision") || [];
+section("等程式審查的 PR", pulls.map(p => `#${p.number} ${p.title}（${p.headRefName}${p.isDraft ? "・草稿" : ""}${p.reviewDecision === "APPROVED" ? "・已核准，可以合併" : p.reviewDecision === "CHANGES_REQUESTED" ? "・程式要求修改" : ""}）`));
+pulls.filter(p => p.reviewDecision === "CHANGES_REQUESTED").forEach(p => todo.push(`照程式的意見修 PR #${p.number}`));
 
 // 3. 管理台送來的修改（commit 訊息有「管理台」）：同意、編輯文件、上傳素材
 const log = since ? sh(`git log --since="${since}" --format=%h%x09%an%x09%s`) : "";

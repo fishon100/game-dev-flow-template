@@ -1,10 +1,12 @@
 # 推上 main → 跑測試 → 部署到 GitHub Pages → 手機通知（成功或失敗都會通知）
+# 開 PR（技術提案）→ 只跑測試，給程式審查時參考；合併到 main 才部署
 # 第一次用：Settings → Pages → Source 選「GitHub Actions」；（選用）Secrets 加 NTFY_TOPIC
 name: test-and-deploy
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -13,7 +15,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'pages' }}
   cancel-in-progress: true
 
 jobs:
@@ -29,6 +31,7 @@ jobs:
 
   deploy:
     needs: test
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -44,7 +47,7 @@ jobs:
 
   notify:
     needs: [test, deploy]
-    if: always()
+    if: always() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: 手機通知（ntfy）
