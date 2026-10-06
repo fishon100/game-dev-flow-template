@@ -133,7 +133,7 @@ const pulls = (await gh("/pulls?state=open&per_page=30").catch(() => []))
 const runs = allRuns
   .filter(r => r.name !== "workbench").slice(0, 5)
   .map(r => ({
-    name: { "test-and-deploy": "自動測試＋部署", "pages build and deployment": "網站部署" }[r.name] || r.name,
+    name: { "test-and-deploy": "自動測試＋部署", "pages build and deployment": "網站部署", "test-web": "網頁版自動測試" }[r.name] || r.name,
     status: r.status, conclusion: r.conclusion, date: r.created_at, url: r.html_url,
     title: (r.head_commit?.message || r.display_title || "").split("\n")[0],
   }));
