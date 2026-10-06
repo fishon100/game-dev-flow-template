@@ -67,7 +67,7 @@ for (const issue of allIssues) {
   writeFileSync(f, approveTasks(readFileSync(f, "utf8"), `企劃於 GitHub Issue #${issue.number} 同意，${today}`));
   changed.push(f);
   await post(`/issues/${issue.number}/labels`, { labels: ["已同意"] });
-  await post(`/issues/${issue.number}/comments`, { body: `✅ 已記錄企劃同意：提案 \`${c.id}\` 的任務 0.1 已打勾。在管理台按「交給 AI 製作」，或在下面留言 \`@claude 開工\`，AI 就會開始做。` });
+  await post(`/issues/${issue.number}/comments`, { body: `✅ 已記錄企劃同意：提案 \`${c.id}\` 的任務 0.1 已打勾。對 AI 說「做 ${c.id}」就會開始製作。` });
   console.log(`同意：${c.id}（Issue #${issue.number}）`);
 }
 if (changed.length) ({ changes } = readSpectra(root, specDir));
@@ -98,14 +98,11 @@ const pick = label => allIssues.filter(i => i.labels?.some(l => (l.name || l) ==
 const commits = execSync('git log -15 --date=iso-strict --pretty=format:%H%x1f%ad%x1f%an%x1f%s', { encoding: "utf8" })
   .split("\n").filter(Boolean).map(l => { const [sha, date, author, subject] = l.split("\x1f"); return { sha: sha.slice(0, 7), date, author, subject, url: `${repoUrl}/commit/${sha}` }; });
 const allRuns = (await gh("/actions/runs?per_page=30").catch(() => ({ workflow_runs: [] }))).workflow_runs;
-// AI 工作（ai workflow）：管理台顯示「AI 正在做／做完了」；run 的標題就是被 @claude 的 Issue 標題
-const aiRuns = allRuns.filter(r => r.name === "ai").slice(0, 10)
-  .map(r => ({ status: r.status, conclusion: r.conclusion, date: r.created_at, url: r.html_url, title: r.display_title || "", event: r.event }));
-// 開著的 PR（AI 做完會開 PR，給程式審查）
+// 開著的 PR（給程式審查）
 const pulls = (await gh("/pulls?state=open&per_page=30").catch(() => []))
   .map(p => ({ number: p.number, title: p.title, url: p.html_url, user: p.user?.login, created: p.created_at, draft: p.draft, branch: p.head?.ref }));
 const runs = allRuns
-  .filter(r => r.name !== "workbench" && r.name !== "ai").slice(0, 5)
+  .filter(r => r.name !== "workbench").slice(0, 5)
   .map(r => ({
     name: { "test-and-deploy": "自動測試＋部署", "pages build and deployment": "網站部署" }[r.name] || r.name,
     status: r.status, conclusion: r.conclusion, date: r.created_at, url: r.html_url,
@@ -123,8 +120,7 @@ const data = {
   tools: cfg.tools || [], // 專案工具（外掛）：框架以外、這個專案自己的工具
   changes, specs,
   requests: pick("需求"), feedback: pick("回饋"),
-  commits, runs, aiRuns, pulls,
-  aiReady: process.env.AI_READY === "true", // repo 有設 AI 金鑰（ai workflow 才能跑）
+  commits, runs, pulls,
 };
 mkdirSync("workbench-out", { recursive: true });
 writeFileSync("workbench-out/data.json", JSON.stringify(data, null, 1));

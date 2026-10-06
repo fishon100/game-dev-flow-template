@@ -2286,24 +2286,6 @@
    "desc": "自動測試、擬人玩家難度報告"
   }
  ],
- "aiRuns": [
-  {
-   "status": "in_progress",
-   "conclusion": null,
-   "date": "2026-10-05T18:16:49.797Z",
-   "url": "https://github.com/fishon100/game-dev-flow-template/actions",
-   "title": "提案：首領血條改成分段（boss-hp-bar）",
-   "event": "issue_comment"
-  },
-  {
-   "status": "completed",
-   "conclusion": "success",
-   "date": "2026-10-04T16:20:49.797Z",
-   "url": "https://github.com/fishon100/game-dev-flow-template/actions",
-   "title": "回饋：第 5 關球常卡在右上角",
-   "event": "issue_comment"
-  }
- ],
  "pulls": [
   {
    "number": 41,
@@ -2314,6 +2296,5 @@
    "draft": false,
    "branch": "claude/issue-12"
   }
- ],
- "aiReady": false
+ ]
 }

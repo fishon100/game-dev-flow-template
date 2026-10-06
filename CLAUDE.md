@@ -66,14 +66,15 @@ Changes can be parked（暫存）— temporarily moved out of `docs/spectra/chan
 ## 對話指令（完整版見 `docs/flow/07 對 AI 說的話.md`）
 現在做到哪｜看需求｜討論 X｜把 X 開成提案｜同意 X｜看提案｜做 X｜X 改成…｜看回饋｜X 驗收通過｜把主架構規劃書的核心規則抄進 config｜修 X｜同步 <知識庫頁面／表名>｜套用調參｜換上 <素材>｜現在做到哪｜量一下 X 難度｜建／接上 Notion 工作區｜檢查環境｜檢查連接器｜更新工作台｜更新專案首頁｜同步開發流｜備份｜部署
 
-## 在 GitHub 上被 @claude 呼叫時（`.github/workflows/ai.yml`）
-留言的人多半不是程式人員（管理台的「交給 AI」按鈕會幫他留言）。先看留言在哪種 Issue 上：
-- **提案 Issue**（內文有 `<!-- spectra-change: 名稱 -->`）＋「開工／做」：先確認 `tasks.md` 的 0.1 已勾（或這個 Issue 內文的「- [x] 企劃同意」已勾——表示 workbench 正在寫回 0.1），兩個都沒勾就回覆「企劃還沒同意」並停止。已勾就照 `/spectra-apply` 做（沒有 skill 時照 tasks.md 逐項做、勾任務），`node --test` 全過才 commit。做完在 Issue 回覆：做了什麼、怎麼試玩、還有哪些任務要人做（例如【美術】的素材）
-- **提案 Issue**＋其他意見：照意見改提案（`/spectra-ingest` 的做法），0.1 改回未勾，回覆改了什麼、請企劃重新同意
-- **回饋／需求 Issue**＋「寫成提案」：照 `/spectra-propose` 寫提案（遵守 `docs/spectra/config.yaml`），`spxa validate` 通過後直接推上 main（只改 `docs/spectra/changes/` 的提案文件可以直接推），workbench 會自動開提案 Issue 等企劃同意；在原本的回饋／需求 Issue 回覆提案連結。只是小修（錯字、顏色、明確的 bug）不用寫提案，直接修（一樣開 PR）
-- **PR**＋意見：照審查意見改
-- 改到程式或遊戲內容的，一律在新分支工作、開 PR 給程式審查，**不要直接推 main**（只有提案文件例外）；PR 說明寫白話：改了什麼、怎麼驗收、對應哪張提案或哪則回饋
-- 絕不自己勾 0.1；需要企劃決定的事，在 Issue 列出來問
+## AI 協助管理台（管理台不呼叫 AI）
+管理台／工作台是給人**看進度、做決定**的（同意、回饋、編輯、上傳）；**AI 只由人在 Claude 裡下指令啟動**（電腦，或手機 Claude App 的 Remote Control）。管理台上的「對 AI 說…」按鈕只是複製一句指令給人貼。AI 的責任是讓管理台**永遠反映真實進度**：
+- 寫提案、勾任務、改提案、驗收歸檔後**都要 commit＋push**（workbench Action 約 1 分鐘更新管理台）；只在本機做完不推＝管理台看不到
+- 提案照 `docs/spectra/config.yaml` 寫：中文標題、需要企劃確認的事、需要人做的任務標【美術】【劇本】【數值】【企劃】【程式】（會出現在該角色的「我的待辦」）
+- 做任務時每完成一項就勾 `tasks.md`（管理台的進度條、下一步就是讀這個）
+- 處理完回饋／需求：在那個 Issue 回覆「改了什麼、哪張提案或哪個版本」並關閉，管理台的「未處理回饋」才會減少
+- 企劃在管理台編輯的企劃文件（`docs/企劃/`）以 GitHub 為準；改企劃文件前先 `git pull`
+- 使用者問「管理台上 X 為什麼沒更新」：先 `gh run list -w workbench -L 3` 看同步有沒有失敗，必要時 `gh workflow run workbench`
+- 不要建立讓管理台、Issue 留言或排程自動叫 AI 開工的機制（團隊決定：AI 一律由人下指令）
 
 ## 「檢查連接器」
 列出 Notion／Figma／Google Drive 連接器與 `gh auth status`；每個都實際讀一樣東西（Notion：`docs/notion.json` 的首頁；Drive：專案資料夾）確認**帳號是專案的帳號**。帳號不對就停下來告訴使用者，不要在別人的雲端硬碟裡搜尋。

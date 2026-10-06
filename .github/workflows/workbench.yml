@@ -1,5 +1,5 @@
 # 工作台：同意勾選 → tasks.md、自動開／關提案 Issue、更新工作台資料（workbench-data 分支）
-# 觸發：推上 main、Issue／PR 有變動、部署或 AI 工作跑完、手動、每小時一次（保險）
+# 觸發：推上 main、Issue／PR 有變動、部署跑完、手動、每小時一次（保險）
 name: workbench
 
 on:
@@ -12,7 +12,7 @@ on:
   pull_request:
     types: [opened, closed, reopened, ready_for_review]
   workflow_run:
-    workflows: ["test-and-deploy", "ai"]
+    workflows: ["test-and-deploy"]
     types: [completed]
   workflow_dispatch:
   schedule:
@@ -42,7 +42,6 @@ jobs:
       - name: 同步提案與工作台資料
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AI_READY: ${{ secrets.ANTHROPIC_API_KEY != '' || secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
         run: node tools/workbench/sync.mjs
       - name: 記錄企劃同意（tasks.md 0.1）
         run: |

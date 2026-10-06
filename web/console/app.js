@@ -1,8 +1,8 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js?v=202610061910";
-import { icon as I, hasIcon } from "./icons.js?v=202610061910";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile } from "./github.js?v=202610062100";
+import { icon as I, hasIcon } from "./icons.js?v=202610062100";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -58,7 +58,6 @@ function sideHtml() {
     ${item("files", "files", "全部文件", content.length)}
     <h6>協作</h6>
     ${item("issues", "message", "回饋與需求", fbOpen, fbOpen > 0)}
-    ${item("ai", "sparkles", "AI 與審查", (d.pulls || []).length + (d.aiRuns || []).filter(aiBusy).length)}
     ${item("activity", "rocket", "上線紀錄")}
     ${tools.length ? `<h6>${I("puzzle", 12)}專案工具</h6>${tools.map(t => `<a class="nav" href="${esc(t.url)}" target="_blank" rel="noopener" title="${esc(t.desc || t.label)}">${I(hasIcon(t.icon) ? t.icon : "wrench")}<span>${esc(t.label)}</span><span class="ext">${I("external", 13)}</span></a>`).join("")}` : ""}
     <h6>系統</h6>
@@ -93,12 +92,11 @@ function changeDetail(c) {
     ${chainHtml(c)}
     <div class="row" style="margin-bottom:14px">
       ${c.status === "待同意" ? approveBtn(c) : ""}
-      ${["已同意", "製作中"].includes(c.status) ? aiBtn(c, "") : ""}
+      ${["已同意", "製作中"].includes(c.status) ? sayBtn(`做 ${c.id}`, "") : c.status === "待驗收" ? sayBtn(`${c.id} 驗收通過`, "") : ""}
       ${c.issue && !c.archived ? `<button class="btn" data-comment="${esc(c.id)}">${I("message")}留言／提問</button>` : ""}
       <a class="btn" href="${tree(folder)}" target="_blank" rel="noopener">${I("fileText")}提案檔案</a>
       ${c.issue ? `<a class="btn" href="${esc(c.issue.url)}" target="_blank" rel="noopener" title="GitHub 上的討論串（Issue）">${I("git")}討論串 #${c.issue.number}${c.issue.comments ? `（${c.issue.comments}）` : ""}</a>` : ""}
     </div>
-    ${aiBanner(c)}
     ${c.tasks.approvalNote ? `<div class="banner">${I("checkCircle")}<span>${esc(c.tasks.approvalNote)}</span></div>` : ""}
     <h3>為什麼</h3><div class="pre">${esc(c.why || "（沒有寫）")}</div>
     <h3 style="margin-top:16px">改什麼</h3><div class="pre">${esc(c.what || "（沒有寫）")}</div>
@@ -141,7 +139,7 @@ V.overview = () => {
     </div>`;
 };
 // ===== 角色與「我的待辦」：首頁依角色列出要做的事 =====
-const ROLES = [["企劃", "fileText", "同意提案、試玩驗收、處理回饋"], ["美術", "image", "標【美術】的任務、待製作的素材"], ["程式", "code", "審查 AI 的 PR、交給 AI、修失敗的測試"], ["劇本／數值", "book", "標【劇本】【數值】的任務"], ["全部", "users", "看所有要處理的事"]];
+const ROLES = [["企劃", "fileText", "同意提案、試玩驗收、處理回饋"], ["美術", "image", "標【美術】的任務、待製作的素材"], ["程式", "code", "審查 PR、叫 AI 製作已同意的提案、修失敗的測試"], ["劇本／數值", "book", "標【劇本】【數值】的任務"], ["全部", "users", "看所有要處理的事"]];
 const ROLE_TAG = { 企劃: /【企劃】/, 美術: /【美術】/, 程式: /【程式】/, "劇本／數值": /【(劇本|數值)】/ };
 S.role = store.get("console:role") || "";
 const rolePicker = () => `<section class="panel role-pick"><div class="ph">${I("users", 15)}<h3>你主要負責什麼？</h3><span class="spacer"></span><span class="muted">首頁會依角色列出你的待辦（之後可以在「需要處理」右上角換）</span></div><div class="pb"><div class="roles">${ROLES.map(([r, ic, desc]) => `<button class="role" data-role="${esc(r)}">${I(ic, 18)}<b>${esc(r)}</b><small>${esc(desc)}</small></button>`).join("")}</div></div></section>`;
@@ -163,15 +161,13 @@ function myTodo(role) {
   const is = (...r) => role === "全部" || r.includes(role);
   if (is("企劃")) {
     by("待同意").forEach(c => add("ap:" + c.id, todoLi("", esc(c.title), `等企劃同意・${esc(c.id)}`, approveBtn(c, `${I("thumbsUp", 14)}同意`) + detailBtn(c))));
-    by("待驗收").forEach(c => add("vf:" + c.id, todoLi("info", esc(c.title), `做完了：試玩後說「${esc(c.id)} 驗收通過」`, detailBtn(c))));
-    if (fbOpen.length + rqOpen.length) add("fb", todoLi("bad", `${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, "看過後可以「交給 AI 寫成提案」", `<button class="btn sm" data-go="issues">查看</button>`));
+    by("待驗收").forEach(c => add("vf:" + c.id, todoLi("info", esc(c.title), "做完了：請試玩，沒問題就跟 AI 說驗收通過", sayBtn(`${c.id} 驗收通過`) + detailBtn(c))));
+    if (fbOpen.length + rqOpen.length) add("fb", todoLi("bad", `${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, "看過後請 AI 整理成提案", sayBtn(fbOpen.length ? "看回饋" : "看需求") + `<button class="btn sm" data-go="issues">查看</button>`));
   }
   if (is("程式")) {
     (d.pulls || []).forEach(p => add("pr:" + p.number, todoLi("info", `審查 PR #${p.number} ${esc(p.title)}`, `${esc(p.user || "")}・${ago(p.created)}${p.draft ? "・草稿" : ""}`, `<a class="btn sm" href="${esc(p.url)}" target="_blank" rel="noopener">審查</a>`)));
     if (d.runs[0]?.conclusion === "failure") add("run", todoLi("bad", `最近一次「${esc(d.runs[0].name)}」失敗`, esc(d.runs[0].title || ""), `<a class="btn sm" href="${esc(d.runs[0].url)}" target="_blank" rel="noopener">看原因</a>`));
-    const lastAi = (d.aiRuns || [])[0];
-    if (lastAi?.conclusion === "failure") add("ai", todoLi("bad", "AI 上一次工作失敗", esc(lastAi.title), `<a class="btn sm" href="${esc(lastAi.url)}" target="_blank" rel="noopener">看原因</a>`));
-    by("已同意").filter(c => !aiBusy(aiRunOf(c))).forEach(c => add("go:" + c.id, todoLi("", esc(c.title), "企劃已同意，還沒開始做", aiBtn(c) + detailBtn(c))));
+    by("已同意").forEach(c => add("go:" + c.id, todoLi("", esc(c.title), "企劃已同意，還沒開始做", sayBtn(`做 ${c.id}`) + detailBtn(c))));
   }
   for (const r of ["企劃", "美術", "程式", "劇本／數值"]) if (is(r)) roleTasks(r).forEach(({ c, text }) => add("t:" + c.id + text, todoLi("warn", esc(text), `提案：${esc(c.title)}`, detailBtn(c))));
   if (is("美術") && S.assetTodo?.repo === S.repo && S.assetTodo.n) add("assets", todoLi("warn", `${S.assetTodo.n} 個素材待製作或要修改`, "素材清單（素材.csv）", `<button class="btn sm" data-go="assets">素材庫</button>`));
@@ -248,7 +244,7 @@ function flowDiagram() {
     for (const s of STAGES) {
       if (s.n === 5) { h += at(5, r, `<span data-node="${c.id}:5" class="node todo" style="opacity:.35"></span>`, "cell small"); continue; }
       if (s.n < st) h += at(s.n, r, `<div class="node done" data-node="${c.id}:${s.n}" title="${s.label}：完成">${I("check", 16)}</div>`, "cell small");
-      else if (s.n === st) h += at(s.n, r, `<div class="node current" data-node="${c.id}:${s.n}" data-change="${esc(c.id)}">${I(st === 3 ? "thumbsUp" : st === 4 ? "code" : st === 6 ? "flask" : "fileText", 18)}<b>${esc(STAGE_HINT[st] || s.label)}</b><small>${aiBusy(aiRunOf(c)) ? "AI 工作中…" : st === 4 ? `任務 ${c.tasks.done}/${c.tasks.total}` : esc(c.status)}</small></div>`, "cell small");
+      else if (s.n === st) h += at(s.n, r, `<div class="node current" data-node="${c.id}:${s.n}" data-change="${esc(c.id)}">${I(st === 3 ? "thumbsUp" : st === 4 ? "code" : st === 6 ? "flask" : "fileText", 18)}<b>${esc(STAGE_HINT[st] || s.label)}</b><small>${st === 4 ? `任務 ${c.tasks.done}/${c.tasks.total}` : esc(c.status)}</small></div>`, "cell small");
       else h += at(s.n, r, `<span class="node todo" data-node="${c.id}:${s.n}"></span>`, "cell small");
     }
   }
@@ -407,35 +403,14 @@ V.tools = () => {
 };
 
 V.issues = () => {
-  const d = S.data, li = i => `<li><span class="status-dot ${i.state === "open" ? "" : "ok"}"></span><div class="g"><a class="t1" href="${esc(i.url)}" target="_blank" rel="noopener" style="color:var(--ink)">${esc(i.title)}</a><div class="muted">#${i.number}・${esc(i.user || "")}・${ago(i.created)}${i.comments ? `・${i.comments} 則留言` : ""}</div></div>${i.state === "open" ? `<button class="btn sm" data-ai="issue:${i.number}" title="AI 會把它寫成提案（小修直接修）">${I("sparkles", 13)}交給 AI</button>` : ""}</li>`;
+  const d = S.data, li = i => `<li><span class="status-dot ${i.state === "open" ? "" : "ok"}"></span><div class="g"><a class="t1" href="${esc(i.url)}" target="_blank" rel="noopener" style="color:var(--ink)">${esc(i.title)}</a><div class="muted">#${i.number}・${esc(i.user || "")}・${ago(i.created)}${i.comments ? `・${i.comments} 則留言` : ""}</div></div>${i.state === "open" ? sayBtn(`把 #${i.number} 開成提案`) : ""}</li>`;
   const open = l => l.filter(i => i.state === "open"), closed = [...d.feedback, ...d.requests].filter(i => i.state !== "open");
   return vh("message", "回饋與需求", "", issueBtns(true)) +
     `<div class="grid2" style="margin-top:0"><div class="card"><h3>${I("gamepad", 14)}回饋（還沒處理）</h3><ul class="list">${open(d.feedback).map(li).join("") || `<li class="empty">沒有</li>`}</ul></div>
     <div class="card"><h3>${I("lightbulb", 14)}需求（還沒處理）</h3><ul class="list">${open(d.requests).map(li).join("") || `<li class="empty">沒有</li>`}</ul></div>
     <div class="card"><h3>${I("checkCircle", 14)}已處理</h3><ul class="list">${closed.map(li).join("") || `<li class="empty">還沒有</li>`}</ul></div></div>`;
 };
-// ===== AI 與審查：AI 在 GitHub 上的工作紀錄、等程式審查的 PR =====
-V.ai = () => {
-  const d = S.data, runs = d.aiRuns || [], pulls = d.pulls || [];
-  const st = r => r.status !== "completed" ? ["", "工作中"] : r.conclusion === "success" ? ["ok", "完成"] : r.conclusion === "skipped" ? ["", "略過"] : ["bad", "失敗"];
-  return vh("sparkles", "AI 與審查", "交給 AI 的工作在 GitHub 上進行，做完開 PR 給程式審查") +
-    (d.aiReady ? "" : `<div class="banner warn">${I("alert", 15)}<span>這個專案還沒設定 AI，所以「交給 AI」只會收到提醒。請程式照下面的「設定一次」做。</span></div>`) +
-    `<div class="grid2" style="margin-top:0">
-    ${panel("sparkles", "AI 工作紀錄", `<ul class="list">${runs.map(r => { const [cls, label] = st(r); return `<li><span class="status-dot ${cls}"></span><div class="g"><a class="t1" href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--ink)">${esc(r.title)}</a><div class="muted">${label}・${ago(r.date)}</div></div></li>`; }).join("") || `<li class="empty">還沒有交給 AI 的工作</li>`}</ul>`)}
-    ${panel("git", "等程式審查的 PR", `<ul class="list">${pulls.map(p => `<li><span class="status-dot info"></span><div class="g"><a class="t1" href="${esc(p.url)}" target="_blank" rel="noopener" style="color:var(--ink)">#${p.number} ${esc(p.title)}</a><div class="muted">${esc(p.user || "")}・${ago(p.created)}${p.draft ? "・草稿" : ""}</div></div><a class="btn sm" href="${esc(p.url)}/files" target="_blank" rel="noopener">看改了什麼</a></li>`).join("") || `<li class="empty">沒有等審查的 PR</li>`}</ul>`)}
-    </div>
-    <div class="card md"><h3>${I("help", 14)}怎麼交給 AI</h3>
-      <ul><li><b>提案</b>：企劃同意後，在提案明細按「交給 AI 製作」。AI 照提案做、跑測試，做完開 PR。</li>
-      <li><b>回饋／需求</b>：在「回饋與需求」按「交給 AI」，AI 會寫成提案（小修直接修）。</li>
-      <li><b>PR</b>：程式審查時在 PR 留言 <code>@claude 請改…</code>，AI 會照著改。</li>
-      <li>不用登入也可以：按鈕會複製一段話，貼到 GitHub 討論串的留言送出就好。</li></ul>
-      <h3>${I("wrench", 14)}設定一次（程式）</h3>
-      <ol><li>到 <a href="https://github.com/apps/claude" target="_blank" rel="noopener">github.com/apps/claude</a> 把 Claude App 裝到這個專案</li>
-      <li>專案的 Settings → Secrets and variables → Actions，新增 <code>ANTHROPIC_API_KEY</code>（Anthropic Console 的 API key，用量計費）或 <code>CLAUDE_CODE_OAUTH_TOKEN</code>（在自己電腦執行 <code>claude setup-token</code>，用 Claude 訂閱額度）</li>
-      <li>在任一個討論串留言 <code>@claude 你好</code> 測試</li></ol>
-      <p class="muted">金鑰屬於誰，費用就算誰的。詳細說明見開發流文件 08。</p></div>`;
-};
-V.activity = () => vh("rocket", "上線紀錄") + `<div class="grid2" style="margin-top:0"><div class="card"><h3>${I("rocket", 14)}自動測試與部署</h3><ul class="list">${S.data.runs.map(runLi).join("") || `<li class="empty">還沒有紀錄</li>`}</ul></div>
+V.activity = () => vh("rocket", "上線紀錄") + `<div class="grid2" style="margin-top:0">${(S.data.pulls || []).length ? `<div class="card"><h3>${I("git", 14)}等程式審查的 PR</h3><ul class="list">${S.data.pulls.map(p => `<li><span class="status-dot info"></span><div class="g"><a class="t1" href="${esc(p.url)}" target="_blank" rel="noopener" style="color:var(--ink)">#${p.number} ${esc(p.title)}</a><div class="muted">${esc(p.user || "")}・${ago(p.created)}${p.draft ? "・草稿" : ""}</div></div><a class="btn sm" href="${esc(p.url)}/files" target="_blank" rel="noopener">看改了什麼</a></li>`).join("")}</ul></div>` : ""}<div class="card"><h3>${I("rocket", 14)}自動測試與部署</h3><ul class="list">${S.data.runs.map(runLi).join("") || `<li class="empty">還沒有紀錄</li>`}</ul></div>
   <div class="card"><h3>${I("git", 14)}最近的改動</h3><ul class="list">${S.data.commits.map(c => `<li><div class="g"><a class="t1" href="${esc(c.url)}" target="_blank" rel="noopener" style="color:var(--ink)">${esc(c.subject)}</a><div class="muted">${esc(c.author)}・${ago(c.date)}・<span style="font-family:var(--mono)">${esc(c.sha)}</span></div></div></li>`).join("")}</ul></div></div>`;
 
 V.projects = () => vh("folder", "專案目錄", "點卡片切換專案") +
@@ -454,7 +429,7 @@ const GLOSSARY = [
   ["已完成", "驗收通過，規則已併回規則書"],
   ["討論串", "GitHub 上的 Issue。每張提案、每則回饋和需求都有一個，可以留言、勾同意"],
   ["PR", "AI 或程式做好的修改，等程式審查後才會合併上線"],
-  ["交給 AI", "在討論串留言 @claude，AI 會在 GitHub 上開始做"],
+  ["對 AI 說", "管理台不會自己叫 AI。按「對 AI 說…」會複製一句指令，貼到 Claude（電腦，或手機的 Remote Control）；AI 做完，管理台約 1 分鐘內更新"],
   ["【美術】等標記", "提案任務開頭的角色標記，會出現在該角色的「我的待辦」"],
   ["登入碼", "選用。讓你不用跳到 GitHub，直接在管理台送出；不登入也可以做所有事"],
 ];
@@ -463,9 +438,9 @@ V.help = () => vh("help", "說明") + `<div class="grid2" style="margin-top:0"><
   <h2>不登入也能用</h2><p>按「同意」「寫回饋」「編輯」「上傳」時，會打開已經填好的 GitHub 網頁，在那裡按一下送出就完成——只要你的瀏覽器有登入 github.com（手機可以用 GitHub App）。想留在管理台裡直接送出、附截圖，再到右上角「登入」設定登入碼。</p>
   <h2>流程圖</h2><p>上方是<b>標準流程</b>（每張提案都會走過的 8 步）；下方每張<b>進行中的提案</b>一條泳道：綠色勾＝走過、亮色格子＝目前在這一步（點開看明細）、空心點＝還沒到。右上角可以切到「結構樹」看每一份文件與任務。</p>
   <h2>同意提案</h2><p>在首頁或提案明細按「同意」；也可以在 GitHub 討論串勾 ☐ 企劃同意、Spectra 桌面版勾任務 0.1、Notion 改「同意」，或對 AI 說「同意 xxx」。</p>
-  <h2>交給 AI</h2><p>企劃同意後按「交給 AI 製作」，AI 會在 GitHub 上做、做完開 PR 給程式審查。進度看左側「AI 與審查」。</p>
+  <h2>AI 怎麼配合管理台</h2><p>管理台是給人<b>看進度、做決定</b>的地方（同意、回饋、編輯）；<b>叫 AI 做事一律在 Claude 裡下指令</b>。需要 AI 的地方會有「對 AI 說…」按鈕：按一下複製指令，貼到 Claude 就好。AI 寫好的提案、做完的任務、處理過的回饋，推上 GitHub 後約 1 分鐘就會出現在管理台。</p>
   <h2>內容庫與素材庫</h2><p>劇本、角色、世界觀、名詞、數值、規劃書。每份文件右上角有「編輯」，分類頁有「新文件」；素材庫可以上傳。</p>
-  <h2>資料多新</h2><p>推上 GitHub、討論串或 PR 有變動、部署或 AI 工作完成時自動更新（約 1 分鐘），另外每小時一次。</p></div>
+  <h2>資料多新</h2><p>推上 GitHub、討論串或 PR 有變動、部署完成時自動更新（約 1 分鐘），另外每小時一次。</p></div>
   <div class="card"><h3>${I("book", 14)}名詞小抄</h3><dl class="gloss">${GLOSSARY.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div></div>`;
 
 // ---------- 文件閱讀 ----------
@@ -606,46 +581,11 @@ const pending = () => { try { const p = JSON.parse(sessionStorage.getItem(pendKe
 const markPending = id => { try { sessionStorage.setItem(pendKey(), JSON.stringify({ ...pending(), [id]: Date.now() })); } catch {} };
 const isPending = c => c.status === "待同意" && !!pending()[c.id];
 const approveBtn = (c, label = `${I("thumbsUp", 15)}同意`) => isPending(c) ? `<span class="chip s-已同意">${I("hourglass", 12)}已同意，系統寫入中</span>` : `<button class="btn ok" data-approve="${esc(c.id)}">${label}</button>`;
-// ---------- AI：在討論串留言 @claude，ai workflow 就會在 GitHub 上開始做 ----------
-const aiRunOf = c => c.issue ? (S.data.aiRuns || []).find(r => r.title.includes(`（${c.id}）`)) : null;
-const aiBusy = r => !!r && r.status !== "completed";
-const aiKey = () => `console:ai:${S.repo}`;
-const aiPending = () => { try { const p = JSON.parse(sessionStorage.getItem(aiKey()) || "{}"); for (const k in p) if (Date.now() - p[k] > 5 * 60000) delete p[k]; return p; } catch { return {}; } };
-const markAi = k => { try { sessionStorage.setItem(aiKey(), JSON.stringify({ ...aiPending(), [k]: Date.now() })); } catch {} };
-const aiBtn = (c, size = "sm") => {
-  if (!c.issue) return "";
-  if (aiBusy(aiRunOf(c)) || aiPending()["change:" + c.id]) return `<span class="chip s-製作中">${I("sparkles", 12)}AI 工作中</span>`;
-  return `<button class="btn ${size} primary" data-ai="change:${esc(c.id)}">${I("sparkles", 14)}交給 AI 製作</button>`;
-};
-function aiBanner(c) {
-  const r = aiRunOf(c); if (!r) return "";
-  const busy = aiBusy(r), ok = r.conclusion === "success";
-  return `<div class="banner ${busy ? "" : ok ? "" : "warn"}">${I("sparkles", 15)}<span>${busy ? `AI 正在做（${ago(r.date)}開始）` : ok ? `AI 上次工作完成（${ago(r.date)}）：看討論串的回覆與 PR` : `AI 上次工作沒有完成（${ago(r.date)}）`}・<a href="${esc(r.url)}" target="_blank" rel="noopener">看過程</a></span></div>`;
-}
-const AI_MSG = { change: id => `@claude 開工：請照提案 \`${id}\` 製作。`, issue: kind => `@claude 寫成提案：請看這則${kind}，寫成提案；只是小修就直接修。` };
-async function doAI(spec) {
-  const [kind, key] = spec.split(":");
-  let num, url, title, msg;
-  if (kind === "change") { const c = S.data.changes.find(x => x.id === key); if (!c?.issue) return; num = c.issue.number; url = c.issue.url; title = c.title; msg = AI_MSG.change(c.id); }
-  else { const i = [...S.data.feedback, ...S.data.requests].find(x => x.number === +key); if (!i) return; num = i.number; url = i.url; title = i.title; msg = AI_MSG.issue(i.labels?.includes("回饋") ? "回饋" : "需求"); }
-  const inApp = canTriage();
-  const v = await dialog("交給 AI", `${target()}
-    ${S.data.aiReady ? "" : `<div class="banner warn">${I("alert", 15)}<span>這個專案還沒設定 AI：現在送出只會收到提醒。請程式照「AI 與審查」頁的「設定一次」做。</span></div>`}
-    <p><b>${esc(title)}</b>（討論串 #${num}）</p>
-    <p class="muted">${kind === "change" ? "AI 會照提案做、跑測試，做完開 PR 給程式審查。進度會留言在討論串。" : "AI 會把它寫成提案，推上來後等企劃同意；只是小修就直接修。"}</p>
-    <label class="fld"><span>補充給 AI 的話（選填）</span><textarea name="extra" style="min-height:70px" placeholder="例：拖尾先做粉紅色就好，其他顏色之後再說"></textarea></label>
-    ${inApp ? "" : `<p class="muted">你還沒登入，所以會<b>複製一段留言</b>並打開討論串：在 GitHub 的留言框貼上、按 Comment 就完成。</p>`}`,
-    [["", "取消"], ["ok", inApp ? "交給 AI" : "複製並打開討論串", "primary"]]);
-  if (v !== "ok") return;
-  const extra = $("#dlg form").extra.value.trim();
-  const body = `${msg}${extra ? `\n\n補充：${extra}` : ""}${inApp ? `\n\n_由 ${auth.user.login} 在開發管理台交給 AI_` : ""}`;
-  if (inApp) {
-    try { await comment(S.repo, num, body); markAi(spec); toast(S.data.aiReady ? "已交給 AI，約 1 分鐘內開始，進度會留言在討論串" : "已送出（AI 還沒設定，會收到提醒）", 6000); render(); }
-    catch (e) { toast("送出失敗：" + e.message, 7000); }
-    return;
-  }
-  try { await navigator.clipboard.writeText(body); } catch {}
-  openWeb(url, "已複製留言：在 GitHub 的留言框貼上、按 Comment");
+// ---------- 對 AI 說：管理台不呼叫 AI；按鈕複製一句指令，貼到 Claude（電腦或手機 Remote Control） ----------
+const sayBtn = (text, size = "sm") => `<button class="btn ${size} say" data-say="${esc(text)}" title="複製這句話，貼到 Claude">${I("message", 13)}對 AI 說「${esc(text)}」</button>`;
+async function copySay(text) {
+  try { await navigator.clipboard.writeText(text); toast(`已複製「${text}」：貼到 Claude（電腦，或手機的 Remote Control）`, 5000); }
+  catch { dialog("對 AI 說", `<p>在 Claude 裡輸入：</p><p><code>${esc(text)}</code></p>`, [["", "關閉"]]); }
 }
 
 // ---------- 不登入：打開預先填好的 GitHub 網頁（瀏覽器有登入 github.com 就能用） ----------
@@ -738,19 +678,17 @@ $("#loginBtn").addEventListener("click", loginFlow);
 
 async function doApprove(id) {
   const c = S.data.changes.find(x => x.id === id); if (!c) return;
-  const v = await dialog("同意提案", `${target()}<p>確定同意 <b>${esc(c.title)}</b>（${esc(c.id)}）？</p>${c.confirm ? `<div class="ask">${esc(c.confirm)}</div>` : ""}${c.issue && S.data.aiReady ? `<label class="row"><input type="checkbox" name="ai" checked> 同意後直接交給 AI 製作（做完會開 PR 給程式審查）</label>` : ""}<p class="muted">如果還有疑問，請改用「留言」。</p>`, [["", "取消"], ["ok", "同意", "ok"]]);
+  const v = await dialog("同意提案", `${target()}<p>確定同意 <b>${esc(c.title)}</b>（${esc(c.id)}）？</p>${c.confirm ? `<div class="ask">${esc(c.confirm)}</div>` : ""}<p class="muted">同意後對 AI 說「做 ${esc(c.id)}」就會開始製作。如果還有疑問，請改用「留言」。</p>`, [["", "取消"], ["ok", "同意", "ok"]]);
   if (v !== "ok") return;
-  const toAi = !!$("#dlg form").ai?.checked;
   try {
     const how = await approveChange(S.repo, c, S.data.specDir, S.data.branch);
-    if (toAi) { await comment(S.repo, c.issue.number, `${AI_MSG.change(c.id)}\n\n_由 ${auth.user.login} 在開發管理台同意並交給 AI_`); markAi("change:" + c.id); }
-    toast((how === "already" ? "這張已經同意過了，系統寫入中" : how === "issue" ? "已同意。約 1 分鐘後任務 0.1 會自動打勾" : "已同意，已寫入任務 0.1") + (toAi ? "；也已交給 AI" : ""), 6000);
+    toast((how === "already" ? "這張已經同意過了，系統寫入中" : how === "issue" ? "已同意。約 1 分鐘後任務 0.1 會自動打勾" : "已同意，已寫入任務 0.1") + `；接著對 AI 說「做 ${c.id}」`, 7000);
     markPending(c.id); render();
   } catch (e) { toast("同意失敗：" + e.message, 7000); }
 }
 async function doComment(id) {
   const c = S.data.changes.find(x => x.id === id); if (!c?.issue) return;
-  const v = await dialog(`留言：${c.title}`, `${target()}<label class="fld"><span>想說什麼（問題、要修改的地方都可以）</span><textarea name="msg" required placeholder="例：拖尾顏色跟著街區配色，手機上請再短一點"></textarea></label><p class="muted">留言會出現在提案的討論串。想讓 AI 照留言改提案，開頭加 <code>@claude</code>。</p>`, [["", "取消"], ["ok", "送出留言", "primary"]]);
+  const v = await dialog(`留言：${c.title}`, `${target()}<label class="fld"><span>想說什麼（問題、要修改的地方都可以）</span><textarea name="msg" required placeholder="例：拖尾顏色跟著街區配色，手機上請再短一點"></textarea></label><p class="muted">留言會出現在提案的討論串。留完對 AI 說「看提案」，AI 會照留言修改。</p>`, [["", "取消"], ["ok", "送出留言", "primary"]]);
   if (v !== "ok") return;
   const msg = $("#dlg form").msg.value.trim(); if (!msg) return;
   try { await comment(S.repo, c.issue.number, msg); c.issue.comments = (c.issue.comments || 0) + 1; toast("已送出留言"); render(); }
@@ -767,7 +705,7 @@ async function doNewIssue(kind) {
     <label class="fld"><span>${fb ? "發生什麼事／想要什麼感覺" : "玩家遇到什麼問題／想要什麼"}</span><textarea name="what" required></textarea></label>
     ${fb ? "" : `<label class="fld"><span>想法、參考（選填）</span><textarea name="idea" style="min-height:70px"></textarea></label><label class="fld"><span>怎樣算做好了（選填）</span><input name="done" placeholder="例：第 1 區新手每關最多掉 1 顆愛心"></label>`}
     ${inApp ? `<label class="fld"><span>截圖（選填，可以多張）</span><input name="shots" type="file" accept="image/*" multiple></label>` : `<p class="muted">會打開填好的 GitHub 表單：截圖可以直接拖進去；檢查一下內容（下拉選項沒帶過去的話再選一次），按 <b>Create</b>。</p>`}
-    <p class="muted">名詞請用名詞表裡的名字。送出後可以按「交給 AI」，或對 AI 說「${fb ? "看回饋" : "看需求"}」。</p>`, [["", "取消"], ["ok", inApp ? "送出" : "下一步：到 GitHub 送出", "primary"]]);
+    <p class="muted">名詞請用名詞表裡的名字。送出後對 AI 說「${fb ? "看回饋" : "看需求"}」。</p>`, [["", "取消"], ["ok", inApp ? "送出" : "下一步：到 GitHub 送出", "primary"]]);
   if (v !== "ok") return;
   const f = $("#dlg form");
   if (!inApp) {
@@ -853,11 +791,11 @@ async function doUpload() {
 }
 // 寫入動作：有登入碼（而且有權限）就直接在管理台做；沒有就打開預先填好的 GitHub 網頁
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-approve],[data-comment],[data-newissue],[data-edit],[data-newdoc],[data-upload],[data-ai],[data-role]");
+  const t = e.target.closest("[data-approve],[data-comment],[data-newissue],[data-edit],[data-newdoc],[data-upload],[data-say],[data-role]");
   if (!t) return;
   e.preventDefault();
   if (t.dataset.role) { S.role = t.dataset.role; store.set("console:role", S.role); render(); return; }
-  if (t.dataset.ai) { doAI(t.dataset.ai); return; }
+  if (t.dataset.say) { copySay(t.dataset.say); return; }
   const inApp = canTriage();
   if (t.dataset.approve) inApp ? doApprove(t.dataset.approve) : webApprove(t.dataset.approve);
   else if (t.dataset.comment) { const c = S.data.changes.find(x => x.id === t.dataset.comment); if (inApp) doComment(c.id); else if (c?.issue) openWeb(c.issue.url, "已打開討論串：拉到最下面留言"); }
@@ -915,7 +853,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610061910"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610062100"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}

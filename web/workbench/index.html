@@ -110,6 +110,7 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
 .list li .btn.sm { flex: none; }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--card); padding: 10px 16px; border-radius: 12px; font-size: 14px; max-width: calc(100% - 32px); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 50; }
 .toast.show { opacity: 1; transform: translateX(-50%); }
+button.btn { font: inherit; cursor: pointer; }
 .note { background: var(--warn-soft, #fbf0e1); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
 </style>
 </head>
@@ -126,7 +127,6 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
       <button role="tab" data-tab="home" aria-selected="true">首頁</button>
       <button role="tab" data-tab="changes">提案</button>
       <button role="tab" data-tab="issues">回饋與需求</button>
-      <button role="tab" data-tab="ai">AI</button>
       <button role="tab" data-tab="specs">規則書</button>
       <button role="tab" data-tab="activity">上線紀錄</button>
       <button role="tab" data-tab="help">怎麼用</button>
@@ -178,22 +178,12 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
     <section><details class="card"><summary>已處理的回饋與需求</summary><ul class="list" id="iss-closed"></ul></details></section>
   </div>
 
-  <div data-panel="ai" hidden>
-    <section id="aiNote" hidden><div class="note">這個專案還沒設定 AI：「交給 AI」只會收到提醒。請程式照管理台「AI 與審查」頁的「設定一次」做。</div></section>
-    <section><h2>AI 工作紀錄 <small>交給 AI 的工作在 GitHub 上進行</small></h2><div class="card"><ul class="list" id="ai-runs"></ul></div></section>
-    <section><h2>等程式審查的 PR <small>AI 做完會開 PR</small></h2><div class="card"><ul class="list" id="ai-pulls"></ul></div></section>
-    <section class="card help"><h3>怎麼交給 AI</h3><ul>
-      <li>企劃同意後，在提案卡片按 <b>交給 AI 製作</b>；回饋或需求按 <b>交給 AI</b></li>
-      <li>會<b>複製一段留言</b>並打開 GitHub 討論串：在留言框<b>貼上、送出</b>就完成（GitHub App 也可以）</li>
-      <li>AI 會在討論串回報進度，做完開 PR 給程式審查，合併後才上線</li>
-    </ul></section>
-  </div>
-
   <div data-panel="specs" hidden>
     <section><h2>規則書 <small>遊戲「現在」的規則；要改請開提案</small></h2><div class="card"><ul class="list" id="specs"></ul></div></section>
   </div>
 
   <div data-panel="activity" hidden>
+    <section id="prSec" hidden><h2>等程式審查的 PR</h2><div class="card"><ul class="list" id="pulls"></ul></div></section>
     <section><h2>自動測試與部署</h2><div class="card"><ul class="list" id="runs"></ul></div></section>
     <section><h2>最近的改動</h2><div class="card"><ul class="list" id="commits"></ul></div></section>
   </div>
@@ -219,7 +209,7 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
       <h3>不在電腦前，怎麼叫 AI 做事</h3>
       <ul>
         <li><b>Claude 手機 App ＋ Remote Control</b>：電腦上的 Claude Code 開著，手機就能看到它在做什麼、直接下指令（電腦要開機、不能睡眠）</li>
-        <li><b>這個工作台＋GitHub App</b>：看進度、同意提案、寫回饋、<b>交給 AI</b>（AI 在 GitHub 上做）——不需要電腦開著</li>
+        <li><b>這個工作台＋GitHub App</b>：看進度、同意提案、寫回饋——不需要電腦開著。需要 AI 的地方有「對 AI 說」按鈕：複製指令，貼到 Claude App（Remote Control）</li>
         <li>每次上線，手機會收到 ntfy 通知（專案有設定的話），點開就能試玩</li>
       </ul>
       <h3>換一台電腦</h3>
@@ -230,7 +220,7 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
       <h3>狀態是什麼意思</h3>
       <ul>
         <li><span class="chip s-待同意">待同意</span> AI 寫好提案，等企劃看過同意</li>
-        <li><span class="chip s-已同意">已同意</span> 可以開始做了：按「交給 AI 製作」，或對 AI 說「做 xxx」</li>
+        <li><span class="chip s-已同意">已同意</span> 可以開始做了：對 AI 說「做 xxx」</li>
         <li><span class="chip s-製作中">製作中</span> AI 正在照任務清單做，進度條是完成的任務數</li>
         <li><span class="chip s-待驗收">待驗收</span> 任務都做完、已上線：請試玩，沒問題就說「xxx 驗收通過」</li>
         <li><span class="chip s-已完成">已完成</span> 規則已併回規則書</li>
@@ -241,7 +231,7 @@ nav.tabs button { display: inline-flex; align-items: center; gap: 6px; }
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { icon as I } from "../console/icons.js?v=202610061920";
+import { icon as I } from "../console/icons.js?v=202610062100";
 (() => {
   const qs = new URLSearchParams(location.search);
   // 看哪個 repo：網址 ?repo=帳號/名稱 優先；再來是上次看的（加到主畫面後開啟時網址沒有 ?repo）；最後從 <帳號>.github.io/<repo>/ 推算
@@ -285,21 +275,15 @@ import { icon as I } from "../console/icons.js?v=202610061920";
     } catch {}
   }
 
-  // ---- 交給 AI：複製「@claude …」留言、打開討論串，貼上送出 ----
-  const aiRunOf = c => c.issue ? (window.__data.aiRuns || []).find(r => r.title.includes(`（${c.id}）`)) : null;
-  const aiBusy = r => !!r && r.status !== "completed";
-  const aiChangeBtn = (c, cls = "btn") => {
-    if (!c.issue) return "";
-    if (aiBusy(aiRunOf(c))) return `<span class="chip s-製作中">${I("sparkles", 13)}AI 工作中</span>`;
-    return `<a class="${cls}" href="${esc(c.issue.url)}" target="_blank" rel="noopener" data-copy="${esc(`@claude 開工：請照提案 \`${c.id}\` 製作。`)}">${I("sparkles", 15)}交給 AI 製作</a>`;
-  };
-  const aiIssueBtn = i => `<a class="btn sm" href="${esc(i.url)}" target="_blank" rel="noopener" data-copy="${esc(`@claude 寫成提案：請看這則${i.labels?.includes("回饋") ? "回饋" : "需求"}，寫成提案；只是小修就直接修。`)}">${I("sparkles", 14)}交給 AI</a>`;
+
+  // ---- 對 AI 說：工作台不呼叫 AI；按鈕複製一句指令，貼到 Claude（電腦，或手機 Claude App 的 Remote Control）----
+  const sayBtn = (text, cls = "btn sm") => `<button class="${cls}" data-say="${esc(text)}" title="複製這句話，貼到 Claude">${I("message", 14)}對 AI 說「${esc(text)}」</button>`;
   document.addEventListener("click", e => {
-    const a = e.target.closest("[data-copy]"); if (!a) return;
-    const text = a.dataset.copy;
+    const a = e.target.closest("[data-say]"); if (!a) return;
+    const text = a.dataset.say;
     (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(
-      () => toast("已複製留言：在 GitHub 的留言框貼上、送出"),
-      () => toast("請在 GitHub 留言：" + text, 9000));
+      () => toast(`已複製「${text}」：貼到 Claude（手機用 Claude App 的 Remote Control）`),
+      () => toast(`請在 Claude 輸入：${text}`, 9000));
   });
 
   // 分頁
@@ -324,7 +308,7 @@ import { icon as I } from "../console/icons.js?v=202610061920";
       ${c.tasks.total ? `<div class="bar" aria-label="進度 ${pct}%"><i style="width:${pct}%"></i></div><div class="muted">任務 ${c.tasks.done}/${c.tasks.total}${c.tasks.next ? `・下一步：${esc(short(c.tasks.next, 40))}` : ""}</div>` : ""}
       ${c.tasks.approvalNote ? `<div class="muted">${I("checkCircle", 14)} ${esc(c.tasks.approvalNote)}</div>` : ""}
       ${c.status === "待驗收" ? `<div class="ask">已經做完：請試玩，沒問題就對 AI 說「${esc(c.id)} 驗收通過」</div>` : ""}
-      <div class="row" style="margin-top:10px">${approve}${["已同意", "製作中"].includes(c.status) ? aiChangeBtn(c, "btn primary") : ""}<a class="btn" href="${files}" target="_blank" rel="noopener">${I("fileText", 16)}完整提案</a>${c.issue && c.status !== "待同意" ? `<a class="btn" href="${esc(c.issue.url)}" target="_blank" rel="noopener">${I("message", 16)}討論 ${c.issue.comments ? `(${c.issue.comments})` : ""}</a>` : ""}</div>
+      <div class="row" style="margin-top:10px">${approve}${["已同意", "製作中"].includes(c.status) ? sayBtn(`做 ${c.id}`, "btn primary") : c.status === "待驗收" ? sayBtn(`${c.id} 驗收通過`, "btn primary") : ""}<a class="btn" href="${files}" target="_blank" rel="noopener">${I("fileText", 16)}完整提案</a>${c.issue && c.status !== "待同意" ? `<a class="btn" href="${esc(c.issue.url)}" target="_blank" rel="noopener">${I("message", 16)}討論 ${c.issue.comments ? `(${c.issue.comments})` : ""}</a>` : ""}</div>
     </article>`;
   }
   const lvClass = t => (/🔴|必修/.test(t) ? "lv-red" : /🟢|很好/.test(t) ? "lv-green" : "lv-yellow");
@@ -352,18 +336,17 @@ import { icon as I } from "../console/icons.js?v=202610061920";
     // 首頁：我的待辦（依角色；跟管理台同一套規則）
     const r = role || "全部", is = (...x) => r === "全部" || x.includes(r);
     const todo = [], item = (title, sub, action = "") => todo.push(`<div class="item"><div class="grow"><b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</div>${action}</div>`);
-    const hbtn = (href, label, copy) => `<a class="btn hbtn" href="${esc(href)}" target="_blank" rel="noopener"${copy ? ` data-copy="${esc(copy)}"` : ""}>${label}</a>`;
+    const hbtn = (href, label) => `<a class="btn hbtn" href="${esc(href)}" target="_blank" rel="noopener">${label}</a>`;
+    const hsay = text => `<button class="btn hbtn" data-say="${esc(text)}" title="複製這句話，貼到 Claude">${I("message", 14)}複製指令</button>`;
     if (is("企劃")) {
       waiting.forEach(c => item(esc(c.title), "等你同意", c.issue ? hbtn(c.issue.url, "看內容並同意") : ""));
-      toClose.forEach(c => item(esc(c.title), `做完了：試玩後說「${esc(c.id)} 驗收通過」`));
-      if (fbOpen.length + rqOpen.length) item(`${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, "在「回饋與需求」可以交給 AI 寫成提案", `<a class="btn hbtn" href="#issues">查看</a>`);
+      toClose.forEach(c => item(esc(c.title), `做完了：試玩後對 AI 說「${esc(c.id)} 驗收通過」`, hsay(`${c.id} 驗收通過`)));
+      if (fbOpen.length + rqOpen.length) item(`${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, `對 AI 說「${fbOpen.length ? "看回饋" : "看需求"}」整理成提案`, hsay(fbOpen.length ? "看回饋" : "看需求"));
     }
     if (is("程式")) {
       (d.pulls || []).forEach(p => item(`審查 PR #${p.number} ${esc(p.title)}`, `${esc(p.user || "")}・${ago(p.created)}`, hbtn(p.url, "審查")));
       if (lastRun && lastRun.conclusion === "failure") item(`最近一次「${esc(lastRun.name)}」失敗`, esc(lastRun.title || ""), hbtn(lastRun.url, "看原因"));
-      const lastAi = (d.aiRuns || [])[0];
-      if (lastAi?.conclusion === "failure") item("AI 上一次工作失敗", esc(lastAi.title), hbtn(lastAi.url, "看原因"));
-      active.filter(c => c.status === "已同意" && !aiBusy(aiRunOf(c))).forEach(c => item(esc(c.title), "企劃已同意，還沒開始做", c.issue ? hbtn(c.issue.url, "交給 AI", `@claude 開工：請照提案 \`${c.id}\` 製作。`) : ""));
+      active.filter(c => c.status === "已同意").forEach(c => item(esc(c.title), `企劃已同意：對 AI 說「做 ${esc(c.id)}」`, hsay(`做 ${c.id}`)));
     }
     for (const x of ["企劃", "美術", "程式", "劇本／數值"]) if (is(x)) for (const c of active) for (const g of c.tasks.groups || []) for (const it of g.items) if (!it.done && ROLE_TAG[x].test(it.text)) item(esc(it.text), `提案：${esc(c.title)}`);
     if (is("美術")) { if (!assetTodo) loadAssetTodo(d); else if (assetTodo.n) item(`${assetTodo.n} 個素材待製作或要修改`, "素材清單（素材.csv），在電腦版管理台的素材庫看細節"); }
@@ -396,8 +379,8 @@ import { icon as I } from "../console/icons.js?v=202610061920";
     $("#ch-archived-n").textContent = `${archived.length} 張`;
     $("#ch-archived").innerHTML = archived.map(c => `<li><span class="chip s-已完成">${esc(c.date.slice(5).replace("-", "/"))}</span><div class="grow"><a class="t" href="${repoUrl}/tree/main/${d.specDir}/changes/archive/${encodeURIComponent(c.folder)}" target="_blank" rel="noopener">${esc(c.title)}</a><div class="muted">${esc(c.id)}・任務 ${c.tasks.done}/${c.tasks.total}</div></div></li>`).join("") || `<li class="empty">還沒有</li>`;
 
-    $("#fb-open").innerHTML = fbOpen.map(i => issueItem(i).replace('<div class="grow">', `<span class="chip ${lvClass(i.title + i.labels.join())}">${/🔴|必修/.test(i.title) ? "必修" : /🟢|很好/.test(i.title) ? "很好" : "回饋"}</span><div class="grow">`).replace("</div></li>", `</div>${aiIssueBtn(i)}</li>`)).join("") || `<li class="empty">沒有未處理的回饋 👍</li>`;
-    $("#rq-open").innerHTML = rqOpen.map(i => issueItem(i).replace("</div></li>", `</div>${aiIssueBtn(i)}</li>`)).join("") || `<li class="empty">沒有未處理的需求</li>`;
+    $("#fb-open").innerHTML = fbOpen.map(i => issueItem(i).replace('<div class="grow">', `<span class="chip ${lvClass(i.title + i.labels.join())}">${/🔴|必修/.test(i.title) ? "必修" : /🟢|很好/.test(i.title) ? "很好" : "回饋"}</span><div class="grow">`).replace("</div></li>", `</div>${sayBtn(`把 #${i.number} 開成提案`)}</li>`)).join("") || `<li class="empty">沒有未處理的回饋 👍</li>`;
+    $("#rq-open").innerHTML = rqOpen.map(i => issueItem(i).replace("</div></li>", `</div>${sayBtn(`把 #${i.number} 開成提案`)}</li>`)).join("") || `<li class="empty">沒有未處理的需求</li>`;
     $("#iss-closed").innerHTML = [...d.feedback, ...d.requests].filter(i => i.state !== "open").map(issueItem).join("") || `<li class="empty">還沒有</li>`;
 
     $("#specs").innerHTML = d.specs.map(s => `<li><div class="grow"><a class="t" href="${repoUrl}/blob/main/${d.specDir}/specs/${encodeURIComponent(s.name)}/spec.md" target="_blank" rel="noopener">${esc(s.name)}</a><div class="muted">${esc(short(s.purpose, 90))}</div></div><span class="chip s-已同意">${s.requirements} 條</span></li>`).join("") || `<li class="empty">還沒有規則書</li>`;
@@ -405,12 +388,8 @@ import { icon as I } from "../console/icons.js?v=202610061920";
     const runItem = r => `<li><span class="dot ${r.conclusion === "success" ? "ok" : r.conclusion === "failure" ? "bad" : "run"}"></span><div class="grow"><a class="t" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.name)}</a><div class="muted">${esc(r.name)}・${r.conclusion === "success" ? "成功" : r.conclusion === "failure" ? "失敗" : "進行中"}・${ago(r.date)}</div></div></li>`;
     $("#home-runs").innerHTML = d.runs.slice(0, 3).map(runItem).join("") || `<li class="empty">還沒有紀錄</li>`;
     $("#runs").innerHTML = d.runs.map(runItem).join("") || `<li class="empty">還沒有紀錄</li>`;
-    const aiSt = x => x.status !== "completed" ? ["run", "工作中"] : x.conclusion === "success" ? ["ok", "完成"] : x.conclusion === "skipped" ? ["", "略過"] : ["bad", "失敗"];
-    $("#aiNote").hidden = !!d.aiReady;
-    $("#ai-runs").innerHTML = (d.aiRuns || []).map(x => { const [cls, label] = aiSt(x); return `<li><span class="dot ${cls}"></span><div class="grow"><a class="t" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a><div class="muted">${label}・${ago(x.date)}</div></div></li>`; }).join("") || `<li class="empty">還沒有交給 AI 的工作</li>`;
-    $("#ai-pulls").innerHTML = (d.pulls || []).map(p => `<li><div class="grow"><a class="t" href="${esc(p.url)}" target="_blank" rel="noopener">#${p.number} ${esc(p.title)}</a><div class="muted">${esc(p.user || "")}・${ago(p.created)}${p.draft ? "・草稿" : ""}</div></div></li>`).join("") || `<li class="empty">沒有等審查的 PR</li>`;
-    const aiN = (d.pulls || []).length + (d.aiRuns || []).filter(aiBusy).length;
-    tabs.find(b => b.dataset.tab === "ai").innerHTML = `${I("sparkles", 15)}AI 與審查${aiN ? `<span class="badge">${aiN}</span>` : ""}`;
+    $("#prSec").hidden = !(d.pulls || []).length;
+    $("#pulls").innerHTML = (d.pulls || []).map(p => `<li><div class="grow"><a class="t" href="${esc(p.url)}" target="_blank" rel="noopener">#${p.number} ${esc(p.title)}</a><div class="muted">${esc(p.user || "")}・${ago(p.created)}${p.draft ? "・草稿" : ""}</div></div></li>`).join("");
     $("#commits").innerHTML = d.commits.map(c => `<li><div class="grow"><a class="t" href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.subject)}</a><div class="muted">${esc(c.author)}・${ago(c.date)}</div></div></li>`).join("");
 
     tabs.find(b => b.dataset.tab === "home").innerHTML = `${I("home", 15)}首頁${todo.length ? `<span class="badge">${todo.length}</span>` : ""}`;
@@ -436,7 +415,7 @@ import { icon as I } from "../console/icons.js?v=202610061920";
   $("#reload").addEventListener("click", load);
   $("#toConsole").href = `../console/?repo=${encodeURIComponent(repo)}`;
   $("#toConsole").innerHTML = I("workflow", 18); $("#reload").innerHTML = I("refresh", 18);
-  const TAB_ICON = { home: "home", changes: "list", issues: "message", ai: "sparkles", specs: "scroll", activity: "rocket", help: "help" };
+  const TAB_ICON = { home: "home", changes: "list", issues: "message", specs: "scroll", activity: "rocket", help: "help" };
   document.addEventListener("click", e => { const b = e.target.closest("[data-role]"); if (!b) return; role = b.dataset.role; store.set("console:role", role); render(window.__data, false); });
   tabs.forEach(b => { b.innerHTML = I(TAB_ICON[b.dataset.tab], 15) + b.textContent.trim(); });
   addEventListener("hashchange", () => { const t = location.hash.slice(1); if (tabs.some(b => b.dataset.tab === t)) show(t); });

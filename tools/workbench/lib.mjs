@@ -121,12 +121,11 @@ export function approvalIssueBody(c, repoUrl, specDir = "docs/spectra") {
     c.confirm ? `### ❓ 需要企劃確認的事\n${cut(c.confirm, 1200)}\n` : "",
     c.breaking ? `> ⚠️ 這張提案有 **BREAKING**：會拿掉或改變玩家已經習慣的東西。\n` : "",
     `---`,
-    `**看完沒問題就勾下面這格**（手機 GitHub App 也可以勾）。勾完幾十秒後，提案的任務 0.1 會自動打勾。`,
-    `之後在管理台按「交給 AI 製作」，或在下面留言 \`@claude 開工\`，AI 就會在 GitHub 上開始做（做完會開 PR 給程式審查）。`,
+    `**看完沒問題就勾下面這格**（手機 GitHub App 也可以勾）。勾完幾十秒後，提案的任務 0.1 會自動打勾，對 AI 說「做 ${c.id}」就會開始製作。`,
     ``,
     `- [ ] 企劃同意`,
     ``,
-    `有意見？直接在下面留言；想讓 AI 照意見改提案，留言開頭加 \`@claude\`。`,
+    `有意見？直接在下面留言，再對 AI 說「看提案」，AI 會照意見修改提案。`,
     `完整內容：${link}`,
   ].filter(l => l !== "").join("\n").replace(/\n(### )/g, "\n\n$1");
 }
