@@ -31,7 +31,21 @@ const LABELS = { 提案: "5319e7", 已同意: "0e8a16", 需求: "1d76db", 回饋
 for (const [name, color] of Object.entries(LABELS)) await post("/labels", { name, color }); // 已存在會回 422，忽略
 
 // ---- 1. 同意：任何一個提案 Issue 勾了「企劃同意」，就把 tasks.md 0.1 打勾 ----
-let allIssues = (await gh("/issues?state=all&per_page=100")).filter(i => !i.pull_request);
+// Issue 清單用 GraphQL：REST 的清單會延遲好幾分鐘（剛開的 Issue 看不到 → 重複開）
+async function listIssues() {
+  const [owner, name] = repo.split("/");
+  const q = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){issues(first:100,orderBy:{field:CREATED_AT,direction:DESC}){nodes{
+    number title body state url createdAt author{login} comments{totalCount} labels(first:20){nodes{name}} assignees(first:10){nodes{login}} }}}}`;
+  const r = await fetch("https://api.github.com/graphql", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ query: q, variables: { owner, name } }) });
+  const j = await r.json();
+  if (!r.ok || j.errors) throw new Error(`GraphQL issues → ${r.status} ${JSON.stringify(j.errors || j).slice(0, 300)}`);
+  // 轉成跟 REST 一樣的欄位，後面的程式不用改
+  return j.data.repository.issues.nodes.map(i => ({
+    number: i.number, title: i.title, body: i.body, state: i.state.toLowerCase(), html_url: i.url, created_at: i.createdAt,
+    user: { login: i.author?.login }, comments: i.comments.totalCount, labels: i.labels.nodes.map(l => ({ name: l.name })), assignees: i.assignees.nodes,
+  }));
+}
+let allIssues = await listIssues();
 // 同一張提案有好幾個 Issue（幾個同步同時跑、GitHub 清單還沒更新時會發生）：留最早的，其餘關掉
 {
   const first = new Map();
