@@ -31,7 +31,22 @@ const LABELS = { 提案: "5319e7", 已同意: "0e8a16", 需求: "1d76db", 回饋
 for (const [name, color] of Object.entries(LABELS)) await post("/labels", { name, color }); // 已存在會回 422，忽略
 
 // ---- 1. 同意：任何一個提案 Issue 勾了「企劃同意」，就把 tasks.md 0.1 打勾 ----
-const allIssues = (await gh("/issues?state=all&per_page=100")).filter(i => !i.pull_request);
+let allIssues = (await gh("/issues?state=all&per_page=100")).filter(i => !i.pull_request);
+// 同一張提案有好幾個 Issue（幾個同步同時跑、GitHub 清單還沒更新時會發生）：留最早的，其餘關掉
+{
+  const first = new Map();
+  for (const i of [...allIssues].sort((a, b) => a.number - b.number)) {
+    const id = (i.body || "").match(ISSUE_MARKER_RE)?.[1]; if (!id) continue;
+    if (!first.has(id)) { first.set(id, i.number); continue; }
+    if (i.state === "open") {
+      await post(`/issues/${i.number}/comments`, { body: `重複了，請看 #${first.get(id)}。` });
+      await post(`/issues/${i.number}`, { state: "closed", state_reason: "not_planned" }, "PATCH");
+      console.log(`關掉重複的 Issue #${i.number}（留 #${first.get(id)}）`);
+    }
+    i.duplicate = true;
+  }
+  allIssues = allIssues.filter(i => !i.duplicate);
+}
 const changed = [];
 let { changes } = readSpectra(root, specDir);
 const hasLabel = (i, name) => i.labels?.some(l => (l.name || l) === name);
