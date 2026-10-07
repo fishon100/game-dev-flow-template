@@ -1,9 +1,9 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow } from "./github.js?v=202610071930";
-import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610071930";
-import { icon as I, hasIcon } from "./icons.js?v=202610071930";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow } from "./github.js?v=202610072000";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610072000";
+import { icon as I, hasIcon } from "./icons.js?v=202610072000";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -335,7 +335,10 @@ function drawFlowLinks(lanes) {
     }
   }
   svg.setAttribute("viewBox", `0 0 ${flow.scrollWidth} ${flow.scrollHeight}`);
-  svg.innerHTML = paths.join("");
+  // 箭頭：每種線一個顏色（marker 的顏色要自己指定，不會跟著線）
+  const arrows = [["base", "var(--line-strong)"], ["on", "var(--accent)"], ["tech", "var(--violet)"], ["done", "var(--ok)"]]
+    .map(([k, c]) => `<marker id="ar-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:${c}"/></marker>`).join("");
+  svg.innerHTML = `<defs>${arrows}</defs>` + paths.join("");
 }
 let flowLanes = [];
 addEventListener("resize", () => { if (S.view === "flow" && S.flowMode === "diagram") drawFlowLinks(flowLanes); });
@@ -1002,7 +1005,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610071930"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610072000"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}
