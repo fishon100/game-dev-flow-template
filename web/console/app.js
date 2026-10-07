@@ -512,7 +512,7 @@ function flowTreeHtml() {
       ${issues(d.requests.filter(i => i.state === "open"), "lightbulb", "需求（還沒處理）")}
       ${issues(d.feedback.filter(i => i.state === "open"), "gamepad", "回饋（還沒處理）")}
       ${isPlan()
-        ? planStages().filter(s => s.n !== 7).map(s => stage(s.milestone ? "checkCircle" : "workflow", `${s.n}. ${esc(s.label)}`, act.filter(c => planStageOf(c) === s.n), false)).join("") + stage("archive", "已完成", arc, !f)
+        ? planStages().filter(s => s.n !== 7).map(s => stage(s.milestone ? "checkCircle" : "workflow", `${s.n}. ${esc(s.label)}`, act.filter(c => planStageOf(c) === s.n), false)).join("") + stage("archive", "待歸檔", act.filter(c => planStageOf(c) === 7), false) + stage("archive", "已完成", arc, !f)
         : `${stage("hourglass", "待同意", by("待同意"), false)}${stage("thumbsUp", "已同意", by("已同意"), false)}${stage("code", "製作中", by("製作中"), false)}${stage("flask", "待驗收", by("待驗收"), false)}${stage("archive", "已完成", arc, !f)}`}
       ${isPlan() ? "" : `<li class="closed"><div class="tnode"><button class="tw">${I("chevronDown", 14)}</button>${I("scroll", 14)}<span class="lbl"><b>規則書</b></span><span class="meta muted">${d.specs.length}</span></div><ul>${d.specs.map(s => `<li><div class="tnode clickable" data-go="specs/${esc(s.name)}"><span class="tw leaf"></span><span class="lbl">${esc(s.name)} <span class="muted">${esc(short(s.purpose, 40))}</span></span><span class="meta muted">${s.requirements} 條</span></div></li>`).join("")}</ul></li>`}
     </ul></li></ul></div>`;
