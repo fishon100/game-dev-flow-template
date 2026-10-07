@@ -1,9 +1,9 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610072300";
-import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610072300";
-import { icon as I, hasIcon } from "./icons.js?v=202610072300";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610080900";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610080900";
+import { icon as I, hasIcon } from "./icons.js?v=202610080900";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -69,7 +69,7 @@ const playLinks = d => (d.links || []).filter(l => /試玩/.test(l.label));
 
 // ---------- 側欄 ----------
 function sideHtml() {
-  const d = S.data, act = d.changes.filter(c => !c.archived), waiting = act.filter(c => c.status === "待同意").length;
+  const d = S.data, act = d.changes.filter(c => !c.archived), waiting = act.filter(c => isPlan() ? [4, 6].includes(planStageOf(c)) : c.status === "待同意").length;
   const content = d.content || [];
   const count = k => content.filter(f => catOf(f) === k).length;
   const fbOpen = d.feedback.filter(i => i.state === "open").length + d.requests.filter(i => i.state === "open").length;
@@ -80,14 +80,14 @@ function sideHtml() {
     ${item("overview", "home", "總覽", waiting, true)}
     ${item("flow", "workflow", "流程圖")}
     ${item("changes", "list", "提案", act.length)}
-    ${item("specs", "scroll", "規則書", d.specs.length)}
+    ${isPlan() ? "" : item("specs", "scroll", "規則書", d.specs.length)}
     <h6>內容庫</h6>
     ${CATS.filter(c => count(c.key)).map(c => item("content/" + c.key, c.ic, c.label, count(c.key))).join("")}
     ${item("assets", "image", "素材庫", content.filter(isAsset).length)}
     ${item("files", "files", "全部文件", content.length)}
     <h6>協作</h6>
     ${item("issues", "message", "回饋與需求", fbOpen, fbOpen > 0)}
-    ${item("activity", "rocket", "上線紀錄")}
+    ${item("activity", "rocket", isPlan() ? "改動紀錄" : "上線紀錄")}
     ${tools.length ? `<h6>${I("puzzle", 12)}專案工具</h6>${tools.map(t => `<a class="nav" href="${esc(t.url)}" target="_blank" rel="noopener" title="${esc(t.desc || t.label)}">${I(hasIcon(t.icon) ? t.icon : "wrench")}<span>${esc(t.label)}</span><span class="ext">${I("external", 13)}</span></a>`).join("")}` : ""}
     <h6>系統</h6>
     ${item("tools", "puzzle", "工具與外掛")}
@@ -178,18 +178,20 @@ V.overview = () => {
   const tools = toolsOf(d);
   // 摘要列：一列看完各階段數量；要處理的數字用狀態色
   const seg = (ic, label, n, go, cls = "") => `<button class="seg-i ${n ? cls : ""}" data-go="${go}"><span class="k">${I(ic, 13)}${label}</span><b>${n}</b></button>`;
-  const active = [...act].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
+  const active = [...act].sort((a, b) => sortKey(a) - sortKey(b));
   const linkRow = (ic, label, n, go) => `<li data-go="${go}" style="cursor:pointer">${I(ic, 15)}<div class="g">${label}</div><span class="muted" style="font-variant-numeric:tabular-nums">${n}</span>${I("chevronRight", 14)}</li>`;
   return `<div class="crumb">${esc(d.repo)}</div>
     ${vh("home", esc(d.name), "", `${playLinks(d).map(l => `<a class="btn primary" href="${esc(l.url)}" target="_blank" rel="noopener">${I("play", 14)}試玩</a>`).join("")}${issueBtns()}`)}
     <div class="strip">
-      ${seg("hourglass", "待同意", by("待同意").length, "flow", "attn")}${seg("code", "製作中", by("已同意").length + by("製作中").length, "flow")}${seg("flask", "待驗收", by("待驗收").length, "flow", "attn")}${seg("archive", "已完成", arc.length, "changes")}${seg("scroll", "規則", d.specs.reduce((n, s) => n + s.requirements, 0), "specs")}${seg("message", "未處理回饋", fbOpen.length + rqOpen.length, "issues", "bad")}
+      ${isPlan()
+        ? planStages().filter(s => s.n !== 7).map(s => seg(s.milestone ? "checkCircle" : "workflow", s.label, act.filter(c => planStageOf(c) === s.n).length, "flow", s.milestone || s.n === 6 ? "attn" : "")).join("") + seg("archive", "已完成", arc.length, "changes")
+        : seg("hourglass", "待同意", by("待同意").length, "flow", "attn") + seg("code", "製作中", by("已同意").length + by("製作中").length, "flow") + seg("flask", "待驗收", by("待驗收").length, "flow", "attn") + seg("archive", "已完成", arc.length, "changes") + seg("scroll", "規則", d.specs.reduce((n, s) => n + s.requirements, 0), "specs")}${seg("message", "未處理回饋", fbOpen.length + rqOpen.length, "issues", "bad")}
     </div>
     ${S.role ? "" : rolePicker()}
     <div class="ov-grid">
       <div class="col">
         ${panel("alert", S.role && S.role !== "全部" ? `我的待辦・${esc(S.role)}` : "需要處理", todo.length ? `<ul class="list">${todo.join("")}</ul>` : `<div class="empty">${S.role && S.role !== "全部" ? `目前沒有${esc(S.role)}要處理的事。提案任務標了【${esc(S.role.split("／")[0])}】就會出現在這裡。` : "目前沒有等待處理的事"}</div>`, `${todo.length ? `<span class="chip c-warn">${todo.length}</span>` : ""}${roleSelect()}`)}
-        ${panel("workflow", "進行中的提案", active.length ? `<table class="t stack"><thead><tr><th>狀態</th><th>提案</th><th>進度</th></tr></thead><tbody>${active.map(c => `<tr class="click" data-change="${esc(c.id)}"><td>${chip(c.status)}</td><td style="min-width:0"><div style="font-weight:600">${esc(c.title)}</div><div class="muted">${c.tasks.next ? `下一步：${esc(short(c.tasks.next, 40))}` : esc(c.id)}</div></td><td style="width:150px">${barHtml(c)}<div class="muted" style="margin-top:4px">${c.tasks.done}/${c.tasks.total} 任務</div></td></tr>`).join("")}</tbody></table>` : `<div class="empty">沒有進行中的提案</div>`, `<button class="btn sm" data-go="flow">${I("workflow", 13)}流程圖</button>`, true)}
+        ${panel("workflow", "進行中的提案", active.length ? `<table class="t stack"><thead><tr><th>狀態</th><th>提案</th><th>進度</th></tr></thead><tbody>${active.map(c => `<tr class="click" data-change="${esc(c.id)}"><td>${chip(c.status)}</td><td style="min-width:0"><div style="font-weight:600">${esc(c.title)}</div><div class="muted">${c.tasks.next ? `下一步：${esc(short(c.tasks.next, 40))}` : esc(c.id)}</div>${isPlan() && planStageOf(c) === 5 ? `<div class="muted">${esc(lanesText(c))}</div>` : ""}</td><td style="width:150px">${barHtml(c)}<div class="muted" style="margin-top:4px">${c.tasks.done}/${c.tasks.total} 任務</div></td></tr>`).join("")}</tbody></table>` : `<div class="empty">沒有進行中的提案</div>`, `<button class="btn sm" data-go="flow">${I("workflow", 13)}流程圖</button>`, true)}
       </div>
       <div class="col">
         ${panel("rocket", "最近上線", `<ul class="list">${d.runs.slice(0, 5).map(runLi).join("") || `<li class="empty">還沒有紀錄</li>`}</ul>`, `<button class="btn sm" data-go="activity">全部</button>`)}
@@ -268,6 +270,16 @@ function panel(ic, title, body, right = "", flush = false) {
 }
 
 // ===== 流程圖：上方是兩條標準流程（企劃提案、技術提案），下方每張進行中的提案一條泳道，標出它走到哪 =====
+// ===== 企劃文件流（data.flow.mode === "planning"）：平台專案的 7 格流程，沒有同意／試玩／規則書 =====
+const isPlan = () => S.data?.flow?.mode === "planning";
+const planStages = () => (S.data?.flow?.stages || []);
+const planStageOf = c => c.archived ? 7 : (c.plan?.current ?? 7);
+const planLabel = n => planStages().find(s => s.n === n)?.label || "";
+// 里程碑小標：◆ M1・2026-10-07，需求會議／◆ M2・待確認
+const msChip = (c, key) => { const m = c.plan?.milestones?.[key]; if (!m) return ""; return `<span class="chip ${m.done ? "c-ok" : "c-warn"}" title="${esc(m.text)}">◆ ${key}${m.done ? `・${esc(m.note || "已確認")}` : "・待確認"}</span>`; };
+// 第 5 階段的並行線：美術 0/2・後端 1/2・前端 0/1
+const lanesText = c => (c.plan?.stages?.find(s => s.n === 5)?.lanes || []).filter(l => l.name).map(l => `${l.name} ${l.done}/${l.total}`).join("・");
+const sortKey = c => isPlan() ? (c.archived ? 99 : 10 - planStageOf(c)) : (ORDER[c.status] ?? 5);
 const STAGES = [
   { n: 1, label: "需求", sub: "回饋／需求" },
   { n: 2, label: "寫提案", sub: "propose" },
@@ -279,7 +291,7 @@ const STAGES = [
   { n: 8, label: "完成", sub: "done" },
 ];
 // 提案目前在第幾格（1～8）
-const stageOf = c => c.archived ? 8 : c.status === "待驗收" ? 6 : c.status === "製作中" || c.status === "已同意" ? 4 : c.status === "待同意" ? 3 : 2;
+const stageOf = c => isPlan() ? planStageOf(c) : (c.archived ? 8 : c.status === "待驗收" ? 6 : c.status === "製作中" || c.status === "已同意" ? 4 : c.status === "待同意" ? 3 : 2);
 const STAGE_HINT = { 3: "等企劃同意", 4: "AI 製作中", 6: "等試玩驗收", 8: "已完成" };
 const STAGE_HINT_TECH = { 3: "等程式同意", 4: "AI 製作中", 6: "等程式審查 PR", 8: "已完成" };
 function flowDiagram() {
@@ -415,10 +427,10 @@ V.flow = () => {
 V.tree = () => { S.flowMode = "tree"; S.view = "flow"; return V.flow(); };
 
 V.changes = () => {
-  const d = S.data, list = [...d.changes].sort((a, b) => (ORDER[a.status] - ORDER[b.status]) || b.folder.localeCompare(a.folder));
+  const d = S.data, list = [...d.changes].sort((a, b) => (sortKey(a) - sortKey(b)) || b.folder.localeCompare(a.folder));
   return vh("list", "提案", "點一列看明細與進度鏈") +
-    `<div class="tablewrap"><table class="t stack"><thead><tr><th>狀態</th><th>提案</th><th>進度</th><th>同意</th><th>日期</th></tr></thead><tbody>
-    ${list.map(c => `<tr class="click ${S.sel === c.id ? "sel" : ""}" data-change="${esc(c.id)}"><td>${chip(c.status)}</td><td><div style="font-weight:600">${esc(c.title)} ${kindChip(c)}</div><div class="muted" style="font-family:var(--mono)">${esc(c.id)}</div></td><td style="min-width:130px">${barHtml(c)}<div class="muted">${c.tasks.done}/${c.tasks.total}</div></td><td>${c.archived || c.tasks.approved ? `<span class="ck">${I("checkCircle", 16)}</span>` : `<span class="ck-no">${I("circle", 16)}</span>`}</td><td class="muted">${esc(c.date || "進行中")}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">還沒有提案</td></tr>`}
+    `<div class="tablewrap"><table class="t stack"><thead><tr><th>狀態</th><th>提案</th><th>進度</th><th>${isPlan() ? "里程碑" : "同意"}</th><th>日期</th></tr></thead><tbody>
+    ${list.map(c => `<tr class="click ${S.sel === c.id ? "sel" : ""}" data-change="${esc(c.id)}"><td>${chip(c.status)}</td><td><div style="font-weight:600">${esc(c.title)} ${kindChip(c)}</div><div class="muted" style="font-family:var(--mono)">${esc(c.id)}</div></td><td style="min-width:130px">${barHtml(c)}<div class="muted">${c.tasks.done}/${c.tasks.total}</div></td><td>${isPlan() ? msChip(c, "M1") + msChip(c, "M2") : c.archived || c.tasks.approved ? `<span class="ck">${I("checkCircle", 16)}</span>` : `<span class="ck-no">${I("circle", 16)}</span>`}</td><td class="muted">${esc(c.date || "進行中")}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">還沒有提案</td></tr>`}
     </tbody></table></div>`;
 };
 
@@ -1056,7 +1068,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610072300"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610080900"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}
