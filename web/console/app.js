@@ -132,11 +132,12 @@ function qaHtml(c) {
 }
 // 提案的文件組合：企劃書（需求定義）、示意圖（介面展示）；介面向的提案才有示意圖
 function docsRow(c) {
-  if (!c.brief && !c.mockups?.length && c.docs !== "介面向") return "";
+  if (!c.brief && !c.mockups?.length && !c.specsheet && c.docs !== "介面向") return "";
   const name = p => p.split("/").pop().replace(/.(md|html)$/, "");
   return `<div class="docs-row"><span class="chip ${c.docs === "介面向" ? "c-info" : ""}" title="${c.docs === "介面向" ? "介面向：企劃書＋示意圖＋規格書" : "系統向：只有企劃書"}">${I("files", 12)}${esc(c.docs)}</span>
     ${c.brief ? `<button class="btn sm" data-opendoc="${esc(c.brief)}">${I("fileText", 14)}企劃書</button>` : ""}
     ${(c.mockups || []).map(p => `<button class="btn sm" data-opendoc="${esc(p)}" title="${esc(p)}">${I("layout", 14)}示意圖：${esc(name(p))}</button>`).join("")}
+    ${c.specsheet ? `<button class="btn sm" data-opendoc="${esc(c.specsheet)}" title="${c.mockups?.includes(c.specsheet) ? "規格書就在示意圖裡：打開後按右下角「註解模式：開」，點黃色 SPEC 看每個版位的規格" : esc(c.specsheet)}">${I("list", 14)}規格書${c.mockups?.includes(c.specsheet) ? "（示意圖註解模式）" : ""}</button>` : ""}
     ${c.docs === "介面向" && !c.mockups?.length ? `<span class="muted">還沒有示意圖</span>` : ""}</div>`;
 }
 function changeDetail(c) {

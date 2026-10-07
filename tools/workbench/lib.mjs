@@ -72,6 +72,8 @@ export function parseProposal(md, fallbackName) {
     docs: /文件[：:]\s*介面/.test(md) ? "介面向" : "系統向",
     brief: ((md.match(/^>\s*企劃書[：:]\s*(.+)$/m) || [])[1] || "").trim(),
     mockups: ((md.match(/^>\s*示意圖[：:]\s*(.+)$/m) || [])[1] || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean),
+    // 規格書：可以跟示意圖同一個檔（示意圖的「註解模式」），括號後面是說明
+    specsheet: ((md.match(/^>\s*規格書[：:]\s*([^\s（(]+)/m) || [])[1] || "").trim(),
     // 試玩重點：給試玩的人（QA／企劃）一項一項確認的事
     qaFocus: pick(/試玩重點/).split("\n").map(l => l.match(/^\s*[-*]\s+(.+)/)?.[1]?.trim()).filter(Boolean),
   };

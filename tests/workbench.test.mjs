@@ -119,3 +119,8 @@ test("內容庫：示意圖（html）也列進來，用 <title> 當名稱", () =
   assert.equal(f.title, "遊戲下載頁");
   assert.equal(f.path, "docs/企劃/示意圖/page.html");
 });
+
+test("規格書：可以寫跟示意圖同一個檔（括號是說明，不算路徑）", () => {
+  const p = parseProposal("> 中文標題：x\n> 文件：介面向\n> 示意圖：docs/企劃/示意圖/a.html\n> 規格書：docs/企劃/示意圖/a.html（同一個檔案，開註解模式）\n\n## Why\n\n。\n", "x");
+  assert.equal(p.specsheet, "docs/企劃/示意圖/a.html");
+});
