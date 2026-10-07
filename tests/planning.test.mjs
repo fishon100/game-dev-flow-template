@@ -130,3 +130,10 @@ test("local-data：企劃模式的 data.json 有 flow.stages 與 changesDir，�
   assert.equal(out.changes[0].plan.current, 5);
   assert.deepEqual(out.requests, []);
 });
+
+test("沒有階段的 tasks.md：stages 空、current null、狀態算「需求」", () => {
+  const p = parseStages("");
+  assert.equal(p.stages.length, 0);
+  assert.equal(p.current, null);
+  assert.equal(planStatus(false, parseStages("")), "需求");
+});

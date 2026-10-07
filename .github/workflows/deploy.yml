@@ -42,7 +42,7 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ vars.PAGES_PATH || 'web' }}   # 企劃文件流的專案設 PAGES_PATH = .（示意圖在 docs/ 底下）
+          path: ${{ vars.PAGES_PATH || 'web' }}   # 預設發布 web/；企劃文件流的專案在 repo 變數（Settings → Secrets and variables → Actions → Variables）設 PAGES_PATH = docs，示意圖才有 Pages 網址
       - id: deployment
         uses: actions/deploy-pages@v4
 

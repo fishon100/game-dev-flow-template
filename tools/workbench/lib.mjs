@@ -95,6 +95,7 @@ export function parseStages(md) {
 /** 企劃文件流的狀態文字：目前階段的名稱／待歸檔／已完成 */
 export function planStatus(archived, plan) {
   if (archived) return "已完成";
+  if (!plan.stages.length) return "需求";
   if (plan.current == null) return "待歸檔";
   return PLAN_STAGES.find(s => s.n === plan.current)?.label || `第 ${plan.current} 階段`;
 }
@@ -239,7 +240,7 @@ export function readSpectra(root, specDir = "docs/spectra", opts = {}) {
   };
   const active = dirs(changesDir).filter(n => n !== "archive").map(n => change(join(changesDir, n), n, false));
   const archived = dirs(join(changesDir, "archive")).map(n => change(join(changesDir, "archive", n), n, true)).sort((a, b) => b.folder.localeCompare(a.folder));
-  const specs = dirs(join(base, "specs")).map(name => {
+  const specs = (planning ? [] : dirs(join(base, "specs"))).map(name => {
     const md = read(join(base, "specs", name, "spec.md"));
     const purposeZh = (md.match(/## Purpose[\s\S]*?> 中文[：:]\s*(.+)/) || [])[1] || "";
     const purpose = purposeZh || (sections(md).Purpose || "").split("\n")[0];

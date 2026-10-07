@@ -420,7 +420,7 @@ console.log(`工作台資料：提案 ${changes.length}、規則書 ${specs.leng
 
 ```yaml
         with:
-          path: ${{ vars.PAGES_PATH || 'web' }}   # 企劃文件流的專案設 PAGES_PATH = .（示意圖在 docs/ 底下）
+          path: ${{ vars.PAGES_PATH || 'web' }}   # 預設發布 web/；企劃文件流的專案在 repo 變數（Settings → Secrets and variables → Actions → Variables）設 PAGES_PATH = docs，示意圖才有 Pages 網址
 ```
 
 - [ ] **Step 6: 跑測試與語法檢查**
@@ -1098,7 +1098,7 @@ cp "/c/Users/SandyWeng/claude-html/03_遊戲資料內頁/遊戲內頁_v21.spec.m
 ```markdown
 ## 這是什麼專案
 - PlayHorny 平台（前台／後台的功能企劃）。**企劃文件流**（`flow: planning`，見下方同名一節與 `docs/flow/10`）：AI 不寫程式，產出企劃書（Notion）、示意圖＋SPEC（`docs/提案/`）並記錄進度
-- 示意圖線上看：`https://fishon100.github.io/playhorny-platform/docs/提案/<id>/示意圖/<檔名>.html`
+- 示意圖線上看：`https://fishon100.github.io/playhorny-platform/提案/<id>/示意圖/<檔名>.html`
 - 讀者：企劃、美術、前端、後端 → 一律**白話繁體中文**
 ```
 
@@ -1129,7 +1129,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 gh repo create fishon100/playhorny-platform --public --description "PlayHorny 平台企劃文件與進度（企劃文件流）" --source . --push
 gh api -X POST repos/fishon100/playhorny-platform/pages -f build_type=workflow
 gh api -X PUT repos/fishon100/playhorny-platform/actions/permissions/workflow -f default_workflow_permissions=write -F can_approve_pull_request_reviews=false
-gh variable set PAGES_PATH --body "." --repo fishon100/playhorny-platform
+gh variable set PAGES_PATH --body "docs" --repo fishon100/playhorny-platform
 gh workflow run workbench --repo fishon100/playhorny-platform
 ```
 
@@ -1140,7 +1140,7 @@ gh run list --repo fishon100/playhorny-platform -L 4
 curl -s https://raw.githubusercontent.com/fishon100/playhorny-platform/workbench-data/data.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const d=JSON.parse(s);console.log(d.flow.mode,d.changes.map(c=>[c.id,c.status,c.plan.current]))})"
 ```
 Expected: `workbench` 與 `test-and-deploy` 都成功；印出 `planning [ [ 'game-page-redesign', '並行製作', 5 ] ]`。
-瀏覽器開 `https://fishon100.github.io/playhorny-platform/docs/提案/game-page-redesign/示意圖/遊戲內頁_v21.html`：示意圖與 SPEC 抽屜正常。
+瀏覽器開 `https://fishon100.github.io/playhorny-platform/提案/game-page-redesign/示意圖/遊戲內頁_v21.html`：示意圖與 SPEC 抽屜正常。
 範本 PR 合併後開 `https://fishon100.github.io/game-dev-flow-template/console/?repo=fishon100/playhorny-platform`：7 格流程圖、提案停在第 5 格、M1 有日期、沒有同意與試玩。（PR 還沒合併時用本機 `node tools/serve.mjs` 開 `http://localhost:8080/console/?repo=fishon100/playhorny-platform` 看。）
 
 ---
