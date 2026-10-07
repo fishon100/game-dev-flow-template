@@ -93,7 +93,16 @@ for (const issue of allIssues) {
     console.log(`重新確認：${c.id}（Issue #${issue.number}）`);
     continue;
   }
-  if (!boxChecked) continue;
+  if (!boxChecked) {
+    // 還沒同意、提案內容改過（例如企劃給了新版示意圖）：討論串換成最新內容，留言說一聲
+    const fresh = approvalIssueBody(c, repoUrl, specDir);
+    if ((issue.body || "").replace(/\r/g, "").trim() !== fresh.trim()) {
+      await post(`/issues/${issue.number}`, { body: fresh }, "PATCH");
+      await post(`/issues/${issue.number}/comments`, { body: `📝 提案 \`${c.id}\` 的內容更新了，上面已換成最新版本（為什麼、改什麼、需要${approverOf(c.kind)}確認的事）。` });
+      console.log(`更新提案內容：${c.id}（Issue #${issue.number}）`);
+    }
+    continue;
+  }
   const f = join(root, specDir, "changes", c.folder, "tasks.md");
   writeFileSync(f, approveTasks(readFileSync(f, "utf8"), `${approverOf(c.kind)}於 GitHub Issue #${issue.number} 同意，${today}`));
   changed.push(f);

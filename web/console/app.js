@@ -1,9 +1,9 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610072200";
-import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610072200";
-import { icon as I, hasIcon } from "./icons.js?v=202610072200";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610072300";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610072300";
+import { icon as I, hasIcon } from "./icons.js?v=202610072300";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -49,9 +49,9 @@ const CATS = [
   { key: "world", label: "世界觀", ic: "globe", test: f => /世界|街區|world/i.test(f.path) },
   { key: "terms", label: "名詞", ic: "tag", test: f => /名詞|命名|term|glossary/i.test(f.name) },
   { key: "numbers", label: "數值", ic: "chart", test: f => /數值|tuning|balance/i.test(f.name) },
+  { key: "specsheets", label: "規格書", ic: "list", test: f => /規格書/.test(f.path) },   // 元件規格（標註在示意圖上；md 是 tools/specsheet.mjs 從註解模式產生的）
   { key: "briefs", label: "企劃書", ic: "fileText", test: f => /企劃書/.test(f.path) },   // 需求定義（為什麼做、做什麼、什麼情境）
   { key: "mockups", label: "示意圖", ic: "layout", test: f => f.ext === "html" && !/規格書/.test(f.path) },   // 介面展示（AI 依企劃書做的 html 畫面）
-  { key: "specsheets", label: "規格書", ic: "list", test: f => f.ext === "html" && /規格書/.test(f.path) },   // 元件規格（標註在示意圖上）
   { key: "plans", label: "規劃書", ic: "fileText", test: f => /規劃書|主架構|規劃|plan/i.test(f.path) },
   { key: "records", label: "紀錄", ic: "history", test: f => /日誌|回饋|紀錄|log/i.test(f.name) },
 ];
@@ -1056,7 +1056,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610072200"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610072300"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}
