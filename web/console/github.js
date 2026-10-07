@@ -1,6 +1,6 @@
 // 管理台的 GitHub 寫入：登入（登入碼）、同意、留言、開回饋／需求、上傳檔案、編輯內容
 // 登入碼只存在這台瀏覽器（localStorage，或勾「只在這次」時存 sessionStorage），只會送到 api.github.com。
-import { setQaItem, failQaItem, updateAssetRow } from "./shared.js?v=202610072100";
+import { setQaItem, failQaItem, updateAssetRow } from "./shared.js?v=202610072200";
 const KEY = "console:auth";
 const API = "https://api.github.com";
 

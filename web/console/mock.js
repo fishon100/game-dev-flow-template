@@ -23,6 +23,9 @@ window.fetch = async (url, init = {}) => {
   if (path.match(/\/issues$/) && method === "POST") return json({ number: ++n, title: body.title, html_url: "#mock-issue", created_at: new Date().toISOString() }, 201);
   if ((m = path.match(/^\/repos\/([^/]+\/[^/]+)\/contents\/(.+)$/))) {
     window.__fileText = window.__fileText || {};
+    // 私人專案的原始內容（Accept: raw）：測試時把檔案放在本機 window.__rawBase 底下
+    const accept = (init.headers && (init.headers.Accept || init.headers.accept)) || "";
+    if (method === "GET" && /raw/.test(accept) && window.__rawBase) return real(window.__rawBase + m[2].split("/").map(encodeURIComponent).join("/"));
     if (method === "GET" && window.__fileText[m[2]] != null) return json({ content: b64(window.__fileText[m[2]]), sha: "mock-sha-3" });
     if (method === "GET") {
       const r = await real(`https://raw.githubusercontent.com/${m[1]}/main/${m[2].split("/").map(encodeURIComponent).join("/")}`);
