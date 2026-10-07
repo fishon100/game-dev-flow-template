@@ -1,9 +1,9 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610080900";
-import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610080900";
-import { icon as I, hasIcon } from "./icons.js?v=202610080900";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610081000";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610081000";
+import { icon as I, hasIcon } from "./icons.js?v=202610081000";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -140,8 +140,8 @@ function docsRow(c) {
   if (!c.brief && !c.mockups?.length && !c.specsheet && !c.design && !c.optimize && c.docs !== "介面向") return "";
   const name = p => p.split("/").pop().replace(/.(md|html)$/, "");
   return `<div class="docs-row"><span class="chip ${c.docs === "介面向" ? "c-info" : ""}" title="${c.docs === "介面向" ? "介面向：企劃書＋示意圖＋規格書" : "系統向：只有企劃書"}">${I("files", 12)}${esc(c.docs)}</span>${c.optimize ? `<button class="chip c-info" data-change="${esc(c.base)}" title="優化案：基於 ${esc(c.base)}">${I("sparkles", 12)}優化・${esc(c.base)}</button>` : ""}
-    ${c.brief ? (/^https?:\/\//.test(c.brief) ? `<a class="btn sm" href="${esc(c.brief.split(/[（(]/)[0].trim())}" target="_blank" rel="noopener" title="${esc(c.brief)}">${I("fileText", 14)}企劃書${/（([^）]+)）/.test(c.brief) ? "・" + esc(c.brief.match(/（([^）]+)）/)[1]) : ""}</a>` : `<button class="btn sm" data-opendoc="${esc(c.brief)}">${I("fileText", 14)}企劃書</button>`) : ""}
-    ${c.design ? `<a class="btn sm" href="${esc(c.design)}" target="_blank" rel="noopener" title="設計稿（備用，正本是示意圖）">${I("layout", 14)}設計稿</a>` : ""}
+    ${c.brief ? (/^https?:\/\//.test(c.brief) ? `<a class="btn sm" href="${esc(c.brief.split(/[（(]/)[0].trim())}" target="_blank" rel="noopener" title="${esc(c.brief)}">${I("fileText", 14)}企劃書${/[（(]([^）)]+)[）)]/.test(c.brief) ? "・" + esc(c.brief.match(/[（(]([^）)]+)[）)]/)[1]) : ""}</a>` : `<button class="btn sm" data-opendoc="${esc(c.brief)}">${I("fileText", 14)}企劃書</button>`) : ""}
+    ${c.design && /^https?:\/\//.test(c.design) ? `<a class="btn sm" href="${esc(c.design)}" target="_blank" rel="noopener" title="設計稿（備用，正本是示意圖）">${I("layout", 14)}設計稿</a>` : ""}
     ${(c.mockups || []).map(p => `<button class="btn sm" data-opendoc="${esc(p)}" title="${esc(p)}">${I("layout", 14)}示意圖：${esc(name(p))}</button>`).join("")}
     ${c.specsheet ? `<button class="btn sm" data-opendoc="${esc(c.specsheet)}" title="${c.mockups?.includes(c.specsheet) ? "規格書就在示意圖裡：打開後按右下角「註解模式：開」，點黃色 SPEC 看每個版位的規格" : esc(c.specsheet)}">${I("list", 14)}規格書${c.mockups?.includes(c.specsheet) ? "（示意圖註解模式）" : ""}</button>` : ""}
     ${c.docs === "介面向" && !c.mockups?.length ? `<span class="muted">還沒有示意圖</span>` : ""}</div>`;
@@ -225,7 +225,7 @@ function roleTasks(role) {
 // 企劃文件流：第 5 階段的並行線，線名就是角色（美術／後端／前端），不用在任務文字標【角色】
 function laneTasks(role) {
   const out = [];
-  for (const c of S.data.changes.filter(x => !x.archived)) for (const l of c.plan?.stages?.find(s => s.n === 5)?.lanes || []) if (l.name === role) for (const it of l.items) if (!it.done && !it.milestone) out.push({ c, text: it.text });
+  for (const c of S.data.changes.filter(x => !x.archived && planStageOf(x) >= 5)) for (const l of c.plan?.stages?.find(s => s.n === 5)?.lanes || []) if (l.name === role) for (const it of l.items) if (!it.done && !it.milestone) out.push({ c, text: it.text });
   return out;
 }
 const todoLi =(dot, title, sub, actions = "") => `<li><span class="status-dot ${dot}"></span><div class="g"><div class="t1">${title}</div>${sub ? `<div class="muted">${sub}</div>` : ""}</div>${actions}</li>`;
@@ -239,7 +239,7 @@ function myTodo(role) {
   if (isPlan()) {
     if (is("企劃")) {
       act.filter(c => planStageOf(c) === 4).forEach(c => add("m1:" + c.id, todoLi("warn", esc(c.title), `等需求確認（M1）：需求會議看企劃書＋示意圖，確認後對 AI 說・${esc(c.id)}`, sayBtn(`${c.id} 需求確認了`) + detailBtn(c))));
-      act.filter(c => planStageOf(c) === 5 && c.plan?.milestones?.M2 && !c.plan.milestones.M2.done && (c.plan.stages.find(s => s.n === 5)?.lanes?.find(l => l.name === "美術")?.items.filter(i => !i.milestone).every(i => i.done))).forEach(c => add("m2:" + c.id, todoLi("warn", esc(c.title), `美術完成了：補 SPEC 介面細節、匯出 spec.md，確認後對 AI 說・${esc(c.id)}`, sayBtn(`${c.id} 規格確認了`) + detailBtn(c))));
+      act.filter(c => { if (planStageOf(c) !== 5 || !c.plan?.milestones?.M2 || c.plan.milestones.M2.done) return false; const art = c.plan.stages.find(s => s.n === 5)?.lanes?.find(l => l.name === "美術")?.items.filter(i => !i.milestone) || []; return art.length > 0 && art.every(i => i.done); }).forEach(c => add("m2:" + c.id, todoLi("warn", esc(c.title), `美術完成了：補 SPEC 介面細節、匯出 spec.md，確認後對 AI 說・${esc(c.id)}`, sayBtn(`${c.id} 規格確認了`) + detailBtn(c))));
       act.filter(c => planStageOf(c) === 6).forEach(c => add("vf:" + c.id, todoLi("info", esc(c.title), `開發完成：照 SPEC 驗收條件逐條驗，通過後對 AI 說・${esc(c.id)}`, sayBtn(`${c.id} 驗收通過`) + detailBtn(c))));
       if (fbOpen.length + rqOpen.length) add("fb", todoLi("bad", `${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, "看過後請 AI 整理成提案或寫回同一張提案", sayBtn(fbOpen.length ? "看回饋" : "看需求") + `<button class="btn sm" data-go="issues">查看</button>`));
     }
@@ -1172,7 +1172,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610080900"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610081000"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}
