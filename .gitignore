@@ -18,3 +18,5 @@ node_modules/
 # 工作台同步的暫存輸出（GitHub Actions 推到 workbench-data 分支）
 workbench-out/
 docs/spectra/.vector-search.db*
+.superpowers/
+web/console/demo.json

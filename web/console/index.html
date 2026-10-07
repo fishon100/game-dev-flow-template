@@ -134,6 +134,10 @@ button.chip { cursor: pointer; } button.chip:hover { filter: brightness(.97); }
 .s-待同意 { background: var(--warn-soft); color: var(--warn); }
 .s-已同意 { background: var(--info-soft); color: var(--info); }
 .s-製作中 { background: var(--accent-soft); color: var(--accent); }
+.s-需求, .s-企劃書, .s-示意圖 { background: var(--line-strong); }
+.s-需求確認, .s-驗收 { background: var(--warn-soft); color: var(--warn); }
+.s-並行製作 { background: var(--accent-soft); color: var(--accent); }
+.s-待歸檔 { background: var(--ok-soft); color: var(--ok); }
 .s-待驗收 { background: var(--violet-soft); color: var(--violet); }
 .s-已完成 { background: var(--ok-soft); color: var(--ok); }
 .c-bad { background: var(--bad-soft); color: var(--bad); } .c-ok { background: var(--ok-soft); color: var(--ok); } .c-warn { background: var(--warn-soft); color: var(--warn); } .c-info { background: var(--info-soft); color: var(--info); }
@@ -209,6 +213,7 @@ table.t { width: 100%; border-collapse: collapse; }
 .flow-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-lg); background-color: var(--canvas); background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 16px 16px; }
 /* 欄寬至少 112px（1366 寬的筆電放得下）：視窗更窄時整張圖在框裡左右捲動，不要把格子擠扁（字會斷得亂七八糟） */
 .flow { position: relative; display: grid; grid-template-columns: 120px repeat(8, minmax(112px, 1fr)); min-width: 1040px; padding: 16px 14px 22px; }
+.flow.plan { grid-template-columns: 120px repeat(7, minmax(112px, 1fr)); min-width: 920px; }
 .flow .col-line { grid-row: 1 / -1; border-left: 1px dashed var(--line-strong); justify-self: start; width: 0; margin-left: -6px; opacity: .7; }
 .flow .head { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 18px; z-index: 1; }
 .flow .num { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--ink); color: var(--panel); font-weight: 600; font-size: 12px; font-family: var(--mono); }
@@ -430,6 +435,6 @@ dialog::backdrop { background: rgb(10 10 20 / .45); }
 </div>
 <dialog id="dlg"></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=202610072300"></script>
+<script type="module" src="app.js?v=202610081100"></script>
 </body>
 </html>

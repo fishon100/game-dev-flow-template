@@ -23,6 +23,7 @@ export function sections(md) {
 
 /** 任務清單：總數、完成數、企劃是否同意（0.1）、同意的註記 */
 export function parseTasks(md) {
+  md = md.replace(/\r\n/g, "\n");
   const items = [...md.matchAll(/^- \[( |x|X)\] (.*)$/gm)].map(m => ({ done: m[1] !== " ", text: m[2].trim() }));
   const approvalItem = items.find(t => /^0\.1 /.test(t.text));
   const work = items.filter(t => t !== approvalItem);
@@ -43,6 +44,60 @@ export function parseTasks(md) {
     approvalNote: note,
     next: work.find(t => !t.done)?.text || "",
   };
+}
+
+// ---------- 企劃文件流（workbench.config.json 的 flow: "planning"）：平台專案用 ----------
+// 階段寫死在這裡，管理台從 data.json 的 flow.stages 讀，兩邊同一份
+export const PLAN_STAGES = [
+  { n: 1, label: "需求", sub: "需求池／回饋" },
+  { n: 2, label: "企劃書", sub: "Notion" },
+  { n: 3, label: "示意圖", sub: "介面向才有" },
+  { n: 4, label: "需求確認", sub: "M1", milestone: "M1" },
+  { n: 5, label: "並行製作", sub: "美術／後端／前端" },
+  { n: 6, label: "驗收", sub: "SPEC 驗收條件" },
+  { n: 7, label: "完成", sub: "歸檔" },
+];
+// 里程碑項目：「M1 需求確認：…（2026-10-07，需求會議）」→ 代號、文字、括號裡的註記
+export const MILESTONE_RE = /^(M\d)\s+(.*?)(?:（([^）]*)）)?\s*$/;
+
+/** tasks.md → 階段（## N. 標題）、並行線（### 線名）、里程碑（M1／M2）。目前階段＝第一個還有沒勾項目的章節 */
+export function parseStages(md) {
+  const stages = [];
+  let st = null, lane = null;
+  for (const line of md.split(/\r?\n/)) {
+    const h2 = line.match(/^##\s+(\d+)\.\s*(.+?)\s*$/);
+    if (h2) { st = { n: +h2[1], title: h2[2].replace(/\s*◆\s*$/, ""), lanes: [] }; lane = null; stages.push(st); continue; }
+    const h3 = line.match(/^###\s+(.+?)\s*$/);
+    if (h3 && st) { lane = { name: h3[1], items: [] }; st.lanes.push(lane); continue; }
+    const it = line.match(/^- \[( |x|X)\] (.*)$/);
+    if (it && st) {
+      if (!lane) { lane = { name: "", items: [] }; st.lanes.push(lane); }
+      const text = it[2].trim(), done = it[1] !== " ", m = text.match(MILESTONE_RE);
+      lane.items.push({ done, text, milestone: m ? m[1] : "", note: m && done ? (m[3] || "") : "" });
+    }
+  }
+  const milestones = {};
+  for (const s of stages) {
+    for (const l of s.lanes) {
+      l.total = l.items.length; l.done = l.items.filter(i => i.done).length;
+      for (const i of l.items) if (i.milestone) milestones[i.milestone] = { done: i.done, note: i.note, stage: s.n, text: i.text };
+    }
+    s.total = s.lanes.reduce((a, l) => a + l.total, 0); s.done = s.lanes.reduce((a, l) => a + l.done, 0);
+  }
+  return {
+    stages, milestones,
+    current: stages.find(s => s.done < s.total)?.n ?? null,
+    total: stages.reduce((a, s) => a + s.total, 0),
+    done: stages.reduce((a, s) => a + s.done, 0),
+  };
+}
+
+/** 企劃文件流的狀態文字：目前階段的名稱／待歸檔／已完成 */
+export function planStatus(archived, plan) {
+  if (archived) return "已完成";
+  if (!plan.stages.length) return "需求";
+  if (plan.current == null) return "待歸檔";
+  return PLAN_STAGES.find(s => s.n === plan.current)?.label || `第 ${plan.current} 階段`;
 }
 
 /** 把 tasks.md 的 0.1 打勾並加註來源；已經勾過就原樣回傳 */
@@ -74,6 +129,11 @@ export function parseProposal(md, fallbackName) {
     mockups: ((md.match(/^>\s*示意圖[：:]\s*(.+)$/m) || [])[1] || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean),
     // 規格書：可以跟示意圖同一個檔（示意圖的「註解模式」），括號後面是說明
     specsheet: ((md.match(/^>\s*規格書[：:]\s*([^\s（(]+)/m) || [])[1] || "").trim(),
+    // 優化案：改既有功能；「基於」是原提案的 id（已歸檔的那張）
+    optimize: /類型[：:]\s*優化/.test(md),
+    base: ((md.match(/^>\s*基於[：:]\s*(\S+)/m) || [])[1] || "").trim(),
+    // 設計稿（例：Claude Design 分享連結）：備用，正本是示意圖
+    design: ((md.match(/^>\s*設計稿[：:]\s*(.+)$/m) || [])[1] || "").trim(),
     // 試玩重點：給試玩的人（QA／企劃）一項一項確認的事
     qaFocus: pick(/試玩重點/).split("\n").map(l => l.match(/^\s*[-*]\s+(.+)/)?.[1]?.trim()).filter(Boolean),
   };
@@ -158,24 +218,29 @@ export function statusOf({ archived, tasks }) {
   return tasks.hasApprovalItem ? "已同意" : "待同意";
 }
 
-/** 讀整個 spec 目錄 → { changes, specs } */
-export function readSpectra(root, specDir = "docs/spectra") {
+/** 讀整個 spec 目錄 → { changes, specs }
+ *  opts.flow：game（預設）／planning；planning 的提案有 plan（階段、並行線、里程碑），status 是階段名稱
+ *  opts.changesDir：提案資料夾（預設 <specDir>/changes；企劃文件流直接用 docs/提案） */
+export function readSpectra(root, specDir = "docs/spectra", opts = {}) {
   const base = join(root, specDir);
+  const planning = opts.flow === "planning";
+  const changesDir = opts.changesDir ? join(root, opts.changesDir) : join(base, "changes");
   const dirs = d => (existsSync(d) ? readdirSync(d).filter(n => !n.startsWith(".") && statSync(join(d, n)).isDirectory()) : []);
   const change = (dir, name, archived) => {
-    const tasks = parseTasks(read(join(dir, "tasks.md")));
+    const tasksMd = read(join(dir, "tasks.md"));
+    const tasks = parseTasks(tasksMd);
     const proposal = parseProposal(read(join(dir, "proposal.md")), name);
     const capabilities = dirs(join(dir, "specs"));
     const reqs = capabilities.flatMap(cap => parseDeltaReqs(read(join(dir, "specs", cap, "spec.md")), cap));
     const date = archived ? (name.match(/^\d{4}-\d{2}-\d{2}/) || [""])[0] : "";
     const id = archived ? name.replace(/^\d{4}-\d{2}-\d{2}-/, "") : name;
     const artifacts = { proposal: existsSync(join(dir, "proposal.md")), specs: capabilities.length > 0, design: existsSync(join(dir, "design.md")), tasks: existsSync(join(dir, "tasks.md")) };
-    return { id, folder: name, archived, date, ...proposal, capabilities, reqs, artifacts, tasks, status: statusOf({ archived, tasks }) };
+    const plan = planning ? parseStages(tasksMd) : undefined;
+    return { id, folder: name, archived, date, ...proposal, capabilities, reqs, artifacts, tasks, plan, status: planning ? planStatus(archived, plan) : statusOf({ archived, tasks }) };
   };
-  const changesDir = join(base, "changes");
   const active = dirs(changesDir).filter(n => n !== "archive").map(n => change(join(changesDir, n), n, false));
   const archived = dirs(join(changesDir, "archive")).map(n => change(join(changesDir, "archive", n), n, true)).sort((a, b) => b.folder.localeCompare(a.folder));
-  const specs = dirs(join(base, "specs")).map(name => {
+  const specs = (planning ? [] : dirs(join(base, "specs"))).map(name => {
     const md = read(join(base, "specs", name, "spec.md"));
     const purposeZh = (md.match(/## Purpose[\s\S]*?> 中文[：:]\s*(.+)/) || [])[1] || "";
     const purpose = purposeZh || (sections(md).Purpose || "").split("\n")[0];

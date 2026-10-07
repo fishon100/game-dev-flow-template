@@ -302,7 +302,7 @@ import { icon as I } from "../console/icons.js?v=202610071900";
 
   function changeCard(c, { compact = false } = {}) {
     const pct = c.tasks.total ? Math.round((c.tasks.done / c.tasks.total) * 100) : 0;
-    const files = `${repoUrl}/tree/main/${window.__data.specDir}/changes/${encodeURIComponent(c.folder)}`;
+    const files = `${repoUrl}/tree/main/${window.__data.changesDir || window.__data.specDir + "/changes"}/${encodeURIComponent(c.folder)}`;
     const approve = c.status === "待同意" && c.issue ? `<a class="btn ok" href="${esc(c.issue.url)}" target="_blank" rel="noopener">${I("thumbsUp", 16)}看內容並同意</a>` : "";
     return `<article class="card">
       <div class="row"><span class="chip s-${esc(c.status)}">${esc(c.status)}</span>${c.kind === "技術" ? '<span class="chip c-tech">技術</span>' : ""}${c.breaking ? '<span class="chip lv-red">BREAKING</span>' : ""}<span class="muted">${esc(c.id)}</span></div>
@@ -392,7 +392,7 @@ import { icon as I } from "../console/icons.js?v=202610071900";
     $("#home-active").innerHTML = active.length ? active.map(c => changeCard(c, { compact: true })).join("") : `<div class="card empty">沒有進行中的提案。新想法寫在「提需求」，再對 AI 說「看需求」。</div>`;
     $("#ch-active").innerHTML = active.length ? active.map(c => changeCard(c)).join("") : `<div class="card empty">沒有進行中的提案。</div>`;
     $("#ch-archived-n").textContent = `${archived.length} 張`;
-    $("#ch-archived").innerHTML = archived.map(c => `<li><span class="chip s-已完成">${esc(c.date.slice(5).replace("-", "/"))}</span><div class="grow"><a class="t" href="${repoUrl}/tree/main/${d.specDir}/changes/archive/${encodeURIComponent(c.folder)}" target="_blank" rel="noopener">${esc(c.title)}</a><div class="muted">${esc(c.id)}・任務 ${c.tasks.done}/${c.tasks.total}</div></div></li>`).join("") || `<li class="empty">還沒有</li>`;
+    $("#ch-archived").innerHTML = archived.map(c => `<li><span class="chip s-已完成">${esc(c.date.slice(5).replace("-", "/"))}</span><div class="grow"><a class="t" href="${repoUrl}/tree/main/${d.changesDir || d.specDir + "/changes"}/archive/${encodeURIComponent(c.folder)}" target="_blank" rel="noopener">${esc(c.title)}</a><div class="muted">${esc(c.id)}・任務 ${c.tasks.done}/${c.tasks.total}</div></div></li>`).join("") || `<li class="empty">還沒有</li>`;
 
     $("#fb-open").innerHTML = fbOpen.map(i => issueItem(i).replace('<div class="grow">', `<span class="chip ${lvClass(i.title + i.labels.join())}">${/🔴|必修/.test(i.title) ? "必修" : /🟢|很好/.test(i.title) ? "很好" : "回饋"}</span><div class="grow">`).replace("</div></li>", `</div>${sayBtn(`把 #${i.number} 開成提案`)}</li>`)).join("") || `<li class="empty">沒有未處理的回饋 👍</li>`;
     $("#rq-open").innerHTML = rqOpen.map(i => issueItem(i).replace("</div></li>", `</div>${sayBtn(`把 #${i.number} 開成提案`)}</li>`)).join("") || `<li class="empty">沒有未處理的需求</li>`;
