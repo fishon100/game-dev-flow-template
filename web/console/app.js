@@ -107,6 +107,11 @@ const ORDER = { 待同意: 0, 待驗收: 1, 製作中: 2, 已同意: 3, 已完�
 const vh = (ic, title, sub = "", right = "") => `<div class="vh"><h1>${I(ic, 20)}${title}</h1>${sub ? `<span class="sub">${sub}</span>` : ""}<div class="spacer"></div>${right}</div>`;
 
 function chainHtml(c) {
+  if (isPlan()) {
+    const cur = planStageOf(c), st = planStages().filter(s => !(s.n === 3 && c.docs !== "介面向"));
+    const now = st.findIndex(s => s.n === cur);
+    return `<div class="chain">${st.map((s, i) => { const ok = c.archived || s.n < cur; return `${i ? `<div class="link ${ok ? "done" : ""}"></div>` : ""}<div class="step ${ok ? "done" : i === now ? "now" : ""}" title="${ok ? "完成" : i === now ? "目前在這一步" : "還沒到"}"><div class="dotc">${ok ? I("check", 13) : s.milestone ? "◆" : s.n}</div><span>${esc(s.label)}</span></div>`; }).join("")}</div>`;
+  }
   const a = c.artifacts || {}, t = c.tasks;
   const steps = [["說明", a.proposal], ["規則", a.specs], ["設計", a.design], ["任務", a.tasks], ["同意", c.archived || t.approved], ["製作", t.total > 0 && t.done === t.total], ["驗收", c.archived]];
   const now = steps.findIndex(([, ok]) => !ok);
@@ -132,16 +137,17 @@ function qaHtml(c) {
 }
 // 提案的文件組合：企劃書（需求定義）、示意圖（介面展示）；介面向的提案才有示意圖
 function docsRow(c) {
-  if (!c.brief && !c.mockups?.length && !c.specsheet && c.docs !== "介面向") return "";
+  if (!c.brief && !c.mockups?.length && !c.specsheet && !c.design && !c.optimize && c.docs !== "介面向") return "";
   const name = p => p.split("/").pop().replace(/.(md|html)$/, "");
-  return `<div class="docs-row"><span class="chip ${c.docs === "介面向" ? "c-info" : ""}" title="${c.docs === "介面向" ? "介面向：企劃書＋示意圖＋規格書" : "系統向：只有企劃書"}">${I("files", 12)}${esc(c.docs)}</span>
-    ${c.brief ? `<button class="btn sm" data-opendoc="${esc(c.brief)}">${I("fileText", 14)}企劃書</button>` : ""}
+  return `<div class="docs-row"><span class="chip ${c.docs === "介面向" ? "c-info" : ""}" title="${c.docs === "介面向" ? "介面向：企劃書＋示意圖＋規格書" : "系統向：只有企劃書"}">${I("files", 12)}${esc(c.docs)}</span>${c.optimize ? `<button class="chip c-info" data-change="${esc(c.base)}" title="優化案：基於 ${esc(c.base)}">${I("sparkles", 12)}優化・${esc(c.base)}</button>` : ""}
+    ${c.brief ? (/^https?:\/\//.test(c.brief) ? `<a class="btn sm" href="${esc(c.brief.split(/[（(]/)[0].trim())}" target="_blank" rel="noopener" title="${esc(c.brief)}">${I("fileText", 14)}企劃書${/（([^）]+)）/.test(c.brief) ? "・" + esc(c.brief.match(/（([^）]+)）/)[1]) : ""}</a>` : `<button class="btn sm" data-opendoc="${esc(c.brief)}">${I("fileText", 14)}企劃書</button>`) : ""}
+    ${c.design ? `<a class="btn sm" href="${esc(c.design)}" target="_blank" rel="noopener" title="設計稿（備用，正本是示意圖）">${I("layout", 14)}設計稿</a>` : ""}
     ${(c.mockups || []).map(p => `<button class="btn sm" data-opendoc="${esc(p)}" title="${esc(p)}">${I("layout", 14)}示意圖：${esc(name(p))}</button>`).join("")}
     ${c.specsheet ? `<button class="btn sm" data-opendoc="${esc(c.specsheet)}" title="${c.mockups?.includes(c.specsheet) ? "規格書就在示意圖裡：打開後按右下角「註解模式：開」，點黃色 SPEC 看每個版位的規格" : esc(c.specsheet)}">${I("list", 14)}規格書${c.mockups?.includes(c.specsheet) ? "（示意圖註解模式）" : ""}</button>` : ""}
     ${c.docs === "介面向" && !c.mockups?.length ? `<span class="muted">還沒有示意圖</span>` : ""}</div>`;
 }
 function changeDetail(c) {
-  const folder = `${S.data.specDir}/changes/${c.archived ? "archive/" : ""}${c.folder}`;
+  const folder = `${S.data.changesDir || S.data.specDir + "/changes"}/${c.archived ? "archive/" : ""}${c.folder}`;
   const groups = taskTree(c.tasks.groups, true);
   return `<button class="ibtn close" data-close aria-label="關閉">${I("x")}</button>
     <div class="row">${chip(c.status)}${kindChip(c)}${c.breaking ? '<span class="chip c-bad">BREAKING</span>' : ""}<span class="muted" style="font-family:var(--mono)">${esc(c.id)}${c.date ? "・" + esc(c.date) : ""}</span></div>
@@ -149,19 +155,21 @@ function changeDetail(c) {
     ${chainHtml(c)}
     ${docsRow(c)}
     <div class="row" style="margin-bottom:14px">
-      ${c.status === "待同意" ? approveBtn(c) : ""}
-      ${["已同意", "製作中"].includes(c.status) ? sayBtn(`做 ${c.id}`, "") : c.status === "待驗收" ? sayBtn(`${c.id} 驗收通過`, "") : ""}
+      ${isPlan() ? "" : c.status === "待同意" ? approveBtn(c) : ""}
+      ${isPlan() ? (planStageOf(c) === 4 ? sayBtn(`${c.id} 需求確認了`, "") : planStageOf(c) === 5 && c.plan?.milestones?.M2 && !c.plan.milestones.M2.done ? sayBtn(`${c.id} 規格確認了`, "") : planStageOf(c) === 6 ? sayBtn(`${c.id} 驗收通過`, "") : "")
+        : ["已同意", "製作中"].includes(c.status) ? sayBtn(`做 ${c.id}`, "") : c.status === "待驗收" ? sayBtn(`${c.id} 驗收通過`, "") : ""}
       ${c.issue && !c.archived ? `<button class="btn" data-comment="${esc(c.id)}">${I("message")}留言／提問</button>` : ""}
       <a class="btn" href="${tree(folder)}" target="_blank" rel="noopener">${I("fileText")}提案檔案</a>
       ${c.issue ? `<a class="btn" href="${esc(c.issue.url)}" target="_blank" rel="noopener" title="GitHub 上的討論串（Issue）">${I("git")}討論串 #${c.issue.number}${c.issue.comments ? `（${c.issue.comments}）` : ""}</a>` : ""}
     </div>
+    ${isPlan() ? `<div class="row" style="margin-bottom:14px">${msChip(c, "M1")}${msChip(c, "M2")}</div>` : ""}
     ${c.tasks.approvalNote ? `<div class="banner">${I("checkCircle")}<span>${esc(c.tasks.approvalNote)}</span></div>` : ""}
-    ${qaHtml(c)}
+    ${isPlan() ? "" : qaHtml(c)}
     <h3>為什麼</h3><div class="pre">${esc(c.why || "（沒有寫）")}</div>
     <h3 style="margin-top:16px">改什麼</h3><div class="pre">${esc(c.what || "（沒有寫）")}</div>
     ${c.confirm ? `<h3 style="margin-top:16px">${I("help", 14)}需要企劃確認的事</h3><div class="ask">${esc(c.confirm)}</div>` : ""}
     ${c.capabilities?.length ? `<h3 style="margin-top:16px">影響的規則書</h3><div class="row">${c.capabilities.map(n => `<button class="chip" data-go="specs/${esc(n)}">${I("scroll", 12)}${esc(n)}</button>`).join("")}</div>` : ""}
-    <h3 style="margin-top:16px">任務 ${c.tasks.done}/${c.tasks.total}</h3>
+    <h3 style="margin-top:16px">${isPlan() ? "階段與任務" : "任務"} ${c.tasks.done}/${c.tasks.total}</h3>
     ${groups ? `<ul class="tree">${groups}</ul>` : `<p class="muted">沒有任務清單</p>`}`;
 }
 
@@ -200,8 +208,8 @@ V.overview = () => {
     </div>`;
 };
 // ===== 角色與「我的待辦」：首頁依角色列出要做的事 =====
-const ROLES = [["企劃", "fileText", "同意提案、確認素材、驗收、處理回饋"], ["美術", "image", "標【美術】的任務、待製作與被退回的素材、交件"], ["程式", "code", "同意技術提案、審查 PR、修失敗的測試"], ["QA", "flask", "照試玩清單試玩、回報不通過"], ["劇本／數值", "book", "標【劇本】【數值】的任務"], ["全部", "users", "看所有要處理的事"]];
-const ROLE_TAG = { 企劃: /【企劃】/, 美術: /【美術】/, 程式: /【程式】/, QA: /【QA】/i, "劇本／數值": /【(劇本|數值)】/ };
+const ROLES = [["企劃", "fileText", "同意提案、確認素材、驗收、處理回饋"], ["美術", "image", "標【美術】的任務、待製作與被退回的素材、交件"], ["程式", "code", "同意技術提案、審查 PR、修失敗的測試"], ["前端", "layout", "第 5 階段「前端」線的任務；M2 之後補介面細節"], ["後端", "code", "第 5 階段「後端」線的任務；M1 之後就能開工"],["QA", "flask", "照試玩清單試玩、回報不通過"], ["劇本／數值", "book", "標【劇本】【數值】的任務"], ["全部", "users", "看所有要處理的事"]];
+const ROLE_TAG = { 企劃: /【企劃】/, 美術: /【美術】/, 程式: /【程式】/, QA: /【QA】/i, "劇本／數值": /【(劇本|數值)】/, 前端: /【前端】/, 後端: /【後端】/ };
 // 試玩清單進度（給待辦、流程圖、明細用）
 const qaText = c => c.qa ? `試玩清單 ${c.qa.done}/${c.qa.total}${c.qa.failed ? `・${c.qa.failed} 項不通過` : c.qa.total && c.qa.done === c.qa.total ? "・全部通過" : ""}` : c.status === "待驗收" ? "試玩清單建立中（約 1 分鐘）" : "";
 S.role = store.get("console:role") || "";
@@ -214,7 +222,13 @@ function roleTasks(role) {
   for (const c of S.data.changes.filter(x => !x.archived)) for (const g of c.tasks.groups || []) for (const it of g.items) if (!it.done && re.test(it.text)) out.push({ c, text: it.text });
   return out;
 }
-const todoLi = (dot, title, sub, actions = "") => `<li><span class="status-dot ${dot}"></span><div class="g"><div class="t1">${title}</div>${sub ? `<div class="muted">${sub}</div>` : ""}</div>${actions}</li>`;
+// 企劃文件流：第 5 階段的並行線，線名就是角色（美術／後端／前端），不用在任務文字標【角色】
+function laneTasks(role) {
+  const out = [];
+  for (const c of S.data.changes.filter(x => !x.archived)) for (const l of c.plan?.stages?.find(s => s.n === 5)?.lanes || []) if (l.name === role) for (const it of l.items) if (!it.done && !it.milestone) out.push({ c, text: it.text });
+  return out;
+}
+const todoLi =(dot, title, sub, actions = "") => `<li><span class="status-dot ${dot}"></span><div class="g"><div class="t1">${title}</div>${sub ? `<div class="muted">${sub}</div>` : ""}</div>${actions}</li>`;
 const detailBtn = c => `<button class="btn sm" data-change="${esc(c.id)}">明細</button>`;
 function myTodo(role) {
   const d = S.data, act = d.changes.filter(c => !c.archived), by = s => act.filter(c => c.status === s);
@@ -222,6 +236,17 @@ function myTodo(role) {
   const me = auth.user?.login;
   const items = [], add = (key, html) => { if (!items.some(x => x.key === key)) items.push({ key, html }); };
   const is = (...r) => role === "全部" || r.includes(role);
+  if (isPlan()) {
+    if (is("企劃")) {
+      act.filter(c => planStageOf(c) === 4).forEach(c => add("m1:" + c.id, todoLi("warn", esc(c.title), `等需求確認（M1）：需求會議看企劃書＋示意圖，確認後對 AI 說・${esc(c.id)}`, sayBtn(`${c.id} 需求確認了`) + detailBtn(c))));
+      act.filter(c => planStageOf(c) === 5 && c.plan?.milestones?.M2 && !c.plan.milestones.M2.done && (c.plan.stages.find(s => s.n === 5)?.lanes?.find(l => l.name === "美術")?.items.filter(i => !i.milestone).every(i => i.done))).forEach(c => add("m2:" + c.id, todoLi("warn", esc(c.title), `美術完成了：補 SPEC 介面細節、匯出 spec.md，確認後對 AI 說・${esc(c.id)}`, sayBtn(`${c.id} 規格確認了`) + detailBtn(c))));
+      act.filter(c => planStageOf(c) === 6).forEach(c => add("vf:" + c.id, todoLi("info", esc(c.title), `開發完成：照 SPEC 驗收條件逐條驗，通過後對 AI 說・${esc(c.id)}`, sayBtn(`${c.id} 驗收通過`) + detailBtn(c))));
+      if (fbOpen.length + rqOpen.length) add("fb", todoLi("bad", `${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, "看過後請 AI 整理成提案或寫回同一張提案", sayBtn(fbOpen.length ? "看回饋" : "看需求") + `<button class="btn sm" data-go="issues">查看</button>`));
+    }
+    for (const r of ["美術", "後端", "前端"]) if (is(r)) laneTasks(r).forEach(({ c, text }) => add("l:" + c.id + text, todoLi("warn", esc(text), `提案：${esc(c.title)}・${r}`, detailBtn(c))));
+    for (const r of ["企劃", "美術", "程式", "QA", "劇本／數值", "前端", "後端"]) if (is(r)) roleTasks(r).forEach(({ c, text }) => add("t:" + c.id + text, todoLi("warn", esc(text), `提案：${esc(c.title)}`, detailBtn(c))));
+    return items.map(x => x.html);
+  }
   if (is("企劃")) {
     by("待同意").filter(c => c.kind !== "技術").forEach(c => add("ap:" + c.id, todoLi("", esc(c.title), `等企劃同意・${esc(c.id)}`, approveBtn(c, `${I("thumbsUp", 14)}同意`) + detailBtn(c))));
     by("待驗收").filter(c => c.kind !== "技術").forEach(c => add("vf:" + c.id, todoLi(c.qa?.failed ? "bad" : "info", esc(c.title), `做完了：照試玩清單試玩，沒問題就跟 AI 說驗收通過・${esc(qaText(c))}`, sayBtn(`${c.id} 驗收通過`) + `<button class="btn sm" data-change="${esc(c.id)}">試玩清單</button>`)));
@@ -701,6 +726,8 @@ const GLOSSARY = [
   ["提案", "AI 寫的「要改什麼、為什麼」，企劃同意後才會做。一張提案包含說明、會改到的規則、設計、任務清單"],
   ["規則書", "遊戲「現在」的運作規則（也叫規格書）。只能透過提案改，每條規則都有自動測試"],
   ["規劃書", "企劃寫的想法與方向（企劃書），可以隨時改。想做的事要開提案才會進規則書"],
+  ["企劃文件流", "平台專案的流程：企劃書（Notion）→ 示意圖＋SPEC → 需求確認 M1 → 美術／後端／前端並行（美術完成約九成後規格確認 M2）→ 驗收。程式由公司團隊做，管理台只追進度"],
+  ["里程碑", "M1 需求確認、M2 規格確認：企劃對 AI 說「X 需求確認了」「X 規格確認了」，AI 在 tasks.md 勾起來並記日期。取代遊戲專案的「同意」"],
   ["待同意", "提案寫好了，等企劃看過按同意（技術提案由程式同意）"],
   ["試玩清單", "提案做完、上線後自動開的清單（GitHub 討論串，手機 App 也能勾）：QA 或企劃一項一項試，沒問題就勾；不通過會自動開 🔴 必修回饋。全部勾完再說「驗收通過」"],
   ["素材確認", "美術在素材庫按「交件」上傳 → 狀態變「待確認」→ 企劃按「採用」或「退回（附意見）」→ 採用的由 AI 在「同步」時放進遊戲，狀態變「已放進遊戲」"],
@@ -1137,8 +1164,9 @@ async function loadProjectSums() {
     const el = document.querySelector(`[data-psum="${CSS.escape(p.repo)}"]`); if (!el) continue;
     try {
       const d = p.repo === S.repo ? S.data : await fetchData(p.repo);
-      const act = d.changes.filter(c => !c.archived), w = act.filter(c => c.status === "待同意").length;
-      el.innerHTML = `<div class="row" style="margin-bottom:4px">${w ? `<span class="chip s-待同意">待同意 ${w}</span>` : ""}<span class="chip">進行中 ${act.length}</span><span class="chip s-已完成">已完成 ${d.changes.length - act.length}</span><span class="chip">規則書 ${d.specs.length}</span></div>更新於 ${ago(d.generatedAt)}`;
+      const act = d.changes.filter(c => !c.archived), plan = d.flow?.mode === "planning";
+      const w = plan ? act.filter(c => (c.plan?.current ?? 7) === 4).length : act.filter(c => c.status === "待同意").length;
+      el.innerHTML = `<div class="row" style="margin-bottom:4px">${w ? (plan ? `<span class="chip c-warn">需求確認 ${w}</span>` : `<span class="chip s-待同意">待同意 ${w}</span>`) : ""}<span class="chip">進行中 ${act.length}</span><span class="chip s-已完成">已完成 ${d.changes.length - act.length}</span>${plan ? "" : `<span class="chip">規則書 ${d.specs.length}</span>`}</div>更新於 ${ago(d.generatedAt)}`;
     } catch (e) { el.textContent = e.message; }
   }
 }
