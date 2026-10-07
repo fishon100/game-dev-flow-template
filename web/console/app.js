@@ -1,9 +1,9 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow } from "./github.js?v=202610071900";
-import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610071900";
-import { icon as I, hasIcon } from "./icons.js?v=202610071900";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow } from "./github.js?v=202610071930";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610071930";
+import { icon as I, hasIcon } from "./icons.js?v=202610071930";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -243,7 +243,7 @@ const STAGES = [
 ];
 // 提案目前在第幾格（1～8）
 const stageOf = c => c.archived ? 8 : c.status === "待驗收" ? 6 : c.status === "製作中" || c.status === "已同意" ? 4 : c.status === "待同意" ? 3 : 2;
-const STAGE_HINT = { 3: "等同意", 4: "AI 製作中", 6: "試玩後說「驗收通過」", 8: "已完成" };
+const STAGE_HINT = { 3: "等企劃同意", 4: "AI 製作中", 6: "等試玩驗收", 8: "已完成" };
 const STAGE_HINT_TECH = { 3: "等程式同意", 4: "AI 製作中", 6: "等程式審查 PR", 8: "已完成" };
 function flowDiagram() {
   const d = S.data, act = d.changes.filter(c => !c.archived).sort((a, b) => stageOf(b) - stageOf(a));
@@ -251,7 +251,7 @@ function flowDiagram() {
   const rq = d.requests.filter(i => i.state === "open").length + d.feedback.filter(i => i.state === "open").length;
   let r = 1;
   const at = (col, row, html, cls = "cell") => `<div class="${cls}" style="grid-column:${col + 1};grid-row:${row}">${html}</div>`;
-  const node = (id, ic, title, sub, cls = "") => `<div class="node ${cls}" data-node="${id}">${I(ic, 18)}<b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
+  const node = (id, ic, title, sub, cls = "", tip = "") => `<div class="node ${cls}" data-node="${id}"${tip ? ` title="${esc(tip)}"` : ""}>${I(ic, 18)}<b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
   let h = "";
   for (let i = 0; i <= 8; i++) h += `<div class="col-line" style="grid-column:${i + 1}"></div>`;
   h += `<div style="grid-column:1;grid-row:${r}"></div>` + STAGES.map(s => `<div class="head" style="grid-column:${s.n + 1};grid-row:${r}"><span class="num">${s.n}</span><b>${s.label}</b><small>${s.sub}</small></div>`).join("");
@@ -259,23 +259,23 @@ function flowDiagram() {
   r++;
   h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill brand" title="玩家看得到的改變：玩法、畫面、數值、文字">${I("fileText", 15)}企劃提案</span></div>`;
   h += at(1, r, node("t1", "lightbulb", "提需求／回饋", "管理台、GitHub"));
-  h += at(2, r, node("t2", "fileText", "AI 寫提案", "/spectra-propose", "spectra cmd"));
-  h += at(3, r, node("t3", "thumbsUp", "企劃同意", "討論串勾選、管理台、對話"));
-  h += at(4, r, node("t4", "code", "AI 製作", "先寫測試再做・/spectra-apply", "spectra cmd"));
+  h += at(2, r, node("t2", "fileText", "AI 寫提案", "推上去自動開討論串", "spectra", "Spectra：/spectra-propose"));
+  h += at(3, r, node("t3", "thumbsUp", "企劃同意", "討論串、管理台或對話"));
+  h += at(4, r, node("t4", "code", "AI 製作", "先寫測試再做", "spectra", "Spectra：/spectra-apply（先寫會失敗的測試，再做到測試全過、部署）"));
   h += at(5, r, node("t5", "help", "需求有變？", "製作中被要求調整"));
-  h += at(6, r, node("t6", "flask", "試玩驗收", "照試玩清單試（QA／企劃）・說「驗收通過」", "spectra"));
-  h += at(7, r, node("t7", "archive", "規則併回規則書", "/spectra-archive", "spectra cmd"));
+  h += at(6, r, node("t6", "flask", "試玩驗收", "照試玩清單試玩", "spectra", "QA 或企劃照試玩清單試，全部通過後說「驗收通過」（Spectra：/spectra-verify）"));
+  h += at(7, r, node("t7", "archive", "併回規則書", "驗收後歸檔", "spectra", "Spectra：/spectra-archive"));
   h += at(8, r, node("t8", "checkCircle", "完成", "討論串自動關閉"));
   r++;
-  h += at(2, r, node("t2b", "discuss", "先討論", "需求不清楚時・/spectra-discuss", "spectra cmd ghost"), "cell");
-  h += at(5, r, node("t5b", "ingest", "改提案、重新同意", "/spectra-ingest", "spectra cmd"), "cell");
+  h += at(2, r, node("t2b", "discuss", "先討論", "需求不清楚時", "spectra ghost", "Spectra：/spectra-discuss（先討論，不改程式）"), "cell");
+  h += at(5, r, node("t5b", "ingest", "改提案", "改完要再同意一次", "spectra", "Spectra：/spectra-ingest"), "cell");
   // 技術提案：程式同意、在分支做、開 PR 給程式審查，合併才上線
   r++;
   h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill tech" title="玩家看不到的改變：重構、效能、工具、測試；不改規則書">${I("code", 15)}技術提案</span></div>`;
-  h += at(1, r, node("k1", "wrench", "程式提出", "重構、效能、工具、測試", "tech"));
-  h += at(2, r, node("k2", "fileText", "AI 寫技術提案", "類型：技術", "tech"));
+  h += at(1, r, node("k1", "wrench", "程式提出", "重構、效能、工具", "tech"));
+  h += at(2, r, node("k2", "fileText", "寫技術提案", "AI 寫・類型：技術", "tech"));
   h += at(3, r, node("k3", "thumbsUp", "程式同意", "勾「程式同意」", "tech"));
-  h += at(4, r, node("k4", "code", "AI 在分支製作", "tech/名稱・先寫測試", "tech"));
+  h += at(4, r, node("k4", "code", "分支製作", "AI 先寫測試再做", "tech", "分支 tech/<名稱>"));
   h += at(5, r, node("k5", "gitPr", "開 PR", "GitHub 自動跑測試", "tech"));
   h += at(6, r, node("k6", "users", "程式審查", "要求修改 → AI 改", "tech"));
   h += at(7, r, node("k7", "checkCircle", "合併", "不改規則書", "tech"));
@@ -325,7 +325,7 @@ function drawFlowLinks(lanes) {
     paths.push(`<path class="on" d="M${a5.cx} ${a5.b} V${b5.t}"/>`);
     paths.push(`<path class="on" d="M${b5.l} ${b5.cy} H${a3.cx + R} Q${a3.cx} ${b5.cy} ${a3.cx} ${b5.cy - R} V${a3.b}"/>`);
     paths.push(`<text x="${a5.cx + 6}" y="${(a5.b + b5.t) / 2 + 4}">是</text>`);
-    const a6 = pos("t6"); if (a6) paths.push(`<text x="${(a5.r + a6.l) / 2 - 6}" y="${a5.cy - 8}">否</text>`);
+    const a6 = pos("t6"); if (a6) paths.push(`<text class="sm" text-anchor="middle" x="${(a5.r + a6.l) / 2}" y="${a5.cy - 5}">否</text>`); // 兩格之間只有十幾 px：置中、字小一點，才不會壓到格子
   }
   // 每條泳道：完成的部分綠色、之後灰色虛線
   for (const L of lanes) {
@@ -1002,7 +1002,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610071900"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610071930"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}

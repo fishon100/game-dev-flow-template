@@ -200,7 +200,8 @@ table.t { width: 100%; border-collapse: collapse; }
 
 /* ===== 流程圖（泳道） ===== */
 .flow-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-lg); background-color: var(--canvas); background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 16px 16px; }
-.flow { position: relative; display: grid; grid-template-columns: 128px repeat(8, minmax(100px, 1fr)); min-width: 960px; padding: 16px 14px 22px; }
+/* 欄寬至少 112px（1366 寬的筆電放得下）：視窗更窄時整張圖在框裡左右捲動，不要把格子擠扁（字會斷得亂七八糟） */
+.flow { position: relative; display: grid; grid-template-columns: 120px repeat(8, minmax(112px, 1fr)); min-width: 1040px; padding: 16px 14px 22px; }
 .flow .col-line { grid-row: 1 / -1; border-left: 1px dashed var(--line-strong); justify-self: start; width: 0; margin-left: -6px; opacity: .7; }
 .flow .head { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 18px; z-index: 1; }
 .flow .num { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--ink); color: var(--panel); font-weight: 600; font-size: 12px; font-family: var(--mono); }
@@ -217,12 +218,15 @@ table.t { width: 100%; border-collapse: collapse; }
 .pill.change:hover { border-color: var(--line-strong); }
 .pill.change small { color: var(--faint); font-family: var(--mono); font-size: 10.5px; font-weight: 400; }
 .pill.change > span { text-wrap: balance; line-height: 1.35; }
-.cell { display: flex; align-items: center; justify-content: center; padding: 8px 6px; z-index: 1; min-height: 96px; }
-.cell.small { min-height: 54px; }
-.node { width: 100%; max-width: 124px; min-height: 84px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 8px; border-radius: var(--r-lg); background: var(--panel); border: 1px solid var(--line-strong); text-align: center; box-shadow: var(--shadow); }
+.cell { display: flex; align-items: center; justify-content: center; padding: 8px 7px; z-index: 1; min-height: 104px; }
+.cell.small { min-height: 62px; }
+.cell.small > .node.current { min-height: 58px; padding: 7px 8px; }
+.node { width: 100%; max-width: 136px; min-height: 84px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 8px; border-radius: var(--r-lg); background: var(--panel); border: 1px solid var(--line-strong); text-align: center; box-shadow: var(--shadow); }
 .node .ico { color: var(--sub); margin-bottom: 2px; }
-.node b { font-size: 12.5px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; text-wrap: balance; }
-.node small { font-size: 11px; color: var(--faint); line-height: 1.25; }
+.node b { font-size: 12.5px; font-weight: 600; line-height: 1.25; word-break: keep-all; overflow-wrap: anywhere; text-wrap: balance; }
+.node small { font-size: 11px; color: var(--faint); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-wrap: balance; }
+/* 標準流程的格子一樣高（字多字少都對齊） */
+.cell:not(.small) > .node:not(.done):not(.todo) { height: 96px; }
 .node.spectra { background: color-mix(in srgb, var(--accent-soft) 70%, var(--panel)); border-color: var(--accent-line); }
 .node.spectra .ico { color: var(--accent); }
 .node.cmd b { font-family: var(--mono); font-size: 11.5px; }
@@ -242,6 +246,7 @@ table.t { width: 100%; border-collapse: collapse; }
 .links path.done { stroke: var(--ok); }
 .links path.dash { stroke-dasharray: 5 5; }
 .links text { font: 600 11px var(--font); fill: var(--accent); }
+.links text.sm { font-size: 10px; }
 .lane-sep { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 6px 0; z-index: 1; }
 .lane-title { grid-column: 1 / -1; font-size: 11px; font-weight: 600; color: var(--faint); letter-spacing: .04em; padding: 10px 0 2px; z-index: 1; }
 .legend { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; color: var(--sub); font-size: 12px; margin-top: 12px; }
@@ -412,6 +417,6 @@ dialog::backdrop { background: rgb(10 10 20 / .45); }
 </div>
 <dialog id="dlg"></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=202610071900"></script>
+<script type="module" src="app.js?v=202610071930"></script>
 </body>
 </html>
