@@ -128,6 +128,11 @@ export function parseProposal(md, fallbackName) {
     mockups: ((md.match(/^>\s*示意圖[：:]\s*(.+)$/m) || [])[1] || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean),
     // 規格書：可以跟示意圖同一個檔（示意圖的「註解模式」），括號後面是說明
     specsheet: ((md.match(/^>\s*規格書[：:]\s*([^\s（(]+)/m) || [])[1] || "").trim(),
+    // 優化案：改既有功能；「基於」是原提案的 id（已歸檔的那張）
+    optimize: /類型[：:]\s*優化/.test(md),
+    base: ((md.match(/^>\s*基於[：:]\s*(\S+)/m) || [])[1] || "").trim(),
+    // 設計稿（例：Claude Design 分享連結）：備用，正本是示意圖
+    design: ((md.match(/^>\s*設計稿[：:]\s*(.+)$/m) || [])[1] || "").trim(),
     // 試玩重點：給試玩的人（QA／企劃）一項一項確認的事
     qaFocus: pick(/試玩重點/).split("\n").map(l => l.match(/^\s*[-*]\s+(.+)/)?.[1]?.trim()).filter(Boolean),
   };
@@ -212,21 +217,26 @@ export function statusOf({ archived, tasks }) {
   return tasks.hasApprovalItem ? "已同意" : "待同意";
 }
 
-/** 讀整個 spec 目錄 → { changes, specs } */
-export function readSpectra(root, specDir = "docs/spectra") {
+/** 讀整個 spec 目錄 → { changes, specs }
+ *  opts.flow：game（預設）／planning；planning 的提案有 plan（階段、並行線、里程碑），status 是階段名稱
+ *  opts.changesDir：提案資料夾（預設 <specDir>/changes；企劃文件流直接用 docs/提案） */
+export function readSpectra(root, specDir = "docs/spectra", opts = {}) {
   const base = join(root, specDir);
+  const planning = opts.flow === "planning";
+  const changesDir = opts.changesDir ? join(root, opts.changesDir) : join(base, "changes");
   const dirs = d => (existsSync(d) ? readdirSync(d).filter(n => !n.startsWith(".") && statSync(join(d, n)).isDirectory()) : []);
   const change = (dir, name, archived) => {
-    const tasks = parseTasks(read(join(dir, "tasks.md")));
+    const tasksMd = read(join(dir, "tasks.md"));
+    const tasks = parseTasks(tasksMd);
     const proposal = parseProposal(read(join(dir, "proposal.md")), name);
     const capabilities = dirs(join(dir, "specs"));
     const reqs = capabilities.flatMap(cap => parseDeltaReqs(read(join(dir, "specs", cap, "spec.md")), cap));
     const date = archived ? (name.match(/^\d{4}-\d{2}-\d{2}/) || [""])[0] : "";
     const id = archived ? name.replace(/^\d{4}-\d{2}-\d{2}-/, "") : name;
     const artifacts = { proposal: existsSync(join(dir, "proposal.md")), specs: capabilities.length > 0, design: existsSync(join(dir, "design.md")), tasks: existsSync(join(dir, "tasks.md")) };
-    return { id, folder: name, archived, date, ...proposal, capabilities, reqs, artifacts, tasks, status: statusOf({ archived, tasks }) };
+    const plan = planning ? parseStages(tasksMd) : undefined;
+    return { id, folder: name, archived, date, ...proposal, capabilities, reqs, artifacts, tasks, plan, status: planning ? planStatus(archived, plan) : statusOf({ archived, tasks }) };
   };
-  const changesDir = join(base, "changes");
   const active = dirs(changesDir).filter(n => n !== "archive").map(n => change(join(changesDir, n), n, false));
   const archived = dirs(join(changesDir, "archive")).map(n => change(join(changesDir, "archive", n), n, true)).sort((a, b) => b.folder.localeCompare(a.folder));
   const specs = dirs(join(base, "specs")).map(name => {

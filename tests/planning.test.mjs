@@ -1,7 +1,10 @@
 // tests/planning.test.mjs — 企劃文件流：tasks.md 章節＝階段、### ＝並行線、M1／M2＝里程碑
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseStages, planStatus, PLAN_STAGES } from "../tools/workbench/lib.mjs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { parseStages, planStatus, PLAN_STAGES, parseProposal, readSpectra } from "../tools/workbench/lib.mjs";
 
 const TASKS = `## 1. 需求
 - [x] 1.1 需求來源：Notion 需求池
@@ -67,4 +70,46 @@ test("CRLF 的 tasks.md（Windows）結果跟 LF 一樣", () => {
   assert.equal(p.total, 10);
   assert.equal(p.done, 5);
   assert.equal(p.milestones.M1.note, "2026-10-07，需求會議");
+});
+
+const PROPOSAL = `> 中文標題：遊戲內頁改版
+> 類型：優化
+> 基於：game-page-redesign
+> 文件：介面向
+> 企劃書：https://app.notion.com/p/38711c058c2d8030b36bc9d6bdf36fa3（v1.1）
+> 示意圖：docs/提案/game-page-v2/示意圖/遊戲內頁_v22.html
+> 設計稿：https://claude.ai/design/p/abc
+
+## 為什麼
+
+舊版不好用。
+`;
+
+test("提案：優化案讀得到「基於」，設計稿與企劃書連結原樣保留", () => {
+  const p = parseProposal(PROPOSAL, "game-page-v2");
+  assert.equal(p.optimize, true);
+  assert.equal(p.base, "game-page-redesign");
+  assert.equal(p.design, "https://claude.ai/design/p/abc");
+  assert.equal(p.brief, "https://app.notion.com/p/38711c058c2d8030b36bc9d6bdf36fa3（v1.1）");
+  assert.equal(p.docs, "介面向");
+  assert.equal(parseProposal("## Why\n\nx\n", "a").optimize, false);
+});
+
+test("readSpectra 企劃模式：提案直接放在 docs/提案/<id>，有 plan 與階段狀態；archive 是已完成", () => {
+  const root = mkdtempSync(join(tmpdir(), "plan-"));
+  mkdirSync(join(root, "docs/提案/game-page-redesign"), { recursive: true });
+  writeFileSync(join(root, "docs/提案/game-page-redesign/proposal.md"), PROPOSAL);
+  writeFileSync(join(root, "docs/提案/game-page-redesign/tasks.md"), TASKS);
+  mkdirSync(join(root, "docs/提案/archive/2026-09-01-old"), { recursive: true });
+  writeFileSync(join(root, "docs/提案/archive/2026-09-01-old/tasks.md"), "## 7. 完成\n- [x] 7.1 歸檔\n");
+  const { changes, specs } = readSpectra(root, "docs/提案", { flow: "planning", changesDir: "docs/提案" });
+  assert.equal(specs.length, 0);
+  const c = changes.find(x => x.id === "game-page-redesign");
+  assert.equal(c.status, "並行製作");
+  assert.equal(c.plan.current, 5);
+  assert.equal(c.plan.milestones.M1.done, true);
+  const old = changes.find(x => x.id === "old");
+  assert.equal(old.archived, true);
+  assert.equal(old.status, "已完成");
+  assert.equal(old.date, "2026-09-01");
 });
