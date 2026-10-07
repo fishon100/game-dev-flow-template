@@ -7,7 +7,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { readSpectra, approveTasks, approvalIssueBody, indexContent, approverOf, ISSUE_MARKER_RE, ISSUE_APPROVE_RE, qaItems, qaIssueBody, parseQa, assetSummary, QA_MARKER_RE, QA_ALWAYS } from "./lib.mjs";
+import { readSpectra, approveTasks, approvalIssueBody, indexContent, approverOf, ISSUE_MARKER_RE, ISSUE_APPROVE_RE, qaItems, qaIssueBody, parseQa, assetSummary, QA_MARKER_RE, QA_ALWAYS, PLAN_STAGES } from "./lib.mjs";
 
 const root = process.cwd();
 const repo = process.env.GITHUB_REPOSITORY;
@@ -15,6 +15,10 @@ const token = process.env.GITHUB_TOKEN;
 if (!repo || !token) { console.error("需要 GITHUB_REPOSITORY 與 GITHUB_TOKEN"); process.exit(1); }
 const cfg = existsSync("workbench.config.json") ? JSON.parse(readFileSync("workbench.config.json", "utf8")) : {};
 const specDir = cfg.spec_dir || "docs/spectra";
+// 企劃文件流（平台專案）：提案直接放在 spec_dir（docs/提案）；沒有同意、提案 Issue、試玩清單
+const planning = cfg.flow === "planning";
+const changesDir = planning ? specDir : `${specDir}/changes`;
+const readOpts = { flow: planning ? "planning" : "game", changesDir: planning ? specDir : undefined };
 const repoUrl = `https://github.com/${repo}`;
 const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
 
@@ -64,7 +68,8 @@ let allIssues = await listIssues();
   allIssues = allIssues.filter(i => !i.duplicate);
 }
 const changed = [];
-let { changes } = readSpectra(root, specDir);
+let { changes } = readSpectra(root, specDir, readOpts);
+if (!planning) {
 const hasLabel = (i, name) => i.labels?.some(l => (l.name || l) === name);
 const setBox = async (issue, checked) => {
   issue.body = issue.body.replace(ISSUE_APPROVE_RE, (m, x, who) => `- [${checked ? "x" : " "}] ${who}同意`);
@@ -110,7 +115,7 @@ for (const issue of allIssues) {
   await post(`/issues/${issue.number}/comments`, { body: `✅ 已記錄${approverOf(c.kind)}同意：提案 \`${c.id}\` 的任務 0.1 已打勾。對 AI 說「做 ${c.id}」就會開始製作。` });
   console.log(`同意：${c.id}（Issue #${issue.number}）`);
 }
-if (changed.length) ({ changes } = readSpectra(root, specDir));
+if (changed.length) ({ changes } = readSpectra(root, specDir, readOpts));
 
 // ---- 2、3. 提案 Issue：沒有就開；已同意貼標籤；已完成就關 ----
 const issueOf = id => allIssues.find(i => (i.body || "").match(ISSUE_MARKER_RE)?.[1] === id);
@@ -157,6 +162,8 @@ for (const c of changes) {
   c.qa = { number: qa.number, url: qa.html_url, state: qa.state, ...q };
 }
 
+}
+
 // ---- 4. 工作台資料 ----
 const pick = label => allIssues.filter(i => i.labels?.some(l => (l.name || l) === label))
   .map(i => ({ number: i.number, title: i.title, url: i.html_url, state: i.state, created: i.created_at, user: i.user?.login, labels: i.labels.map(l => l.name || l), comments: i.comments, assignees: (i.assignees || []).map(a => a.login) }));
@@ -173,7 +180,7 @@ const runs = allRuns
     status: r.status, conclusion: r.conclusion, date: r.created_at, url: r.html_url,
     title: (r.head_commit?.message || r.display_title || "").split("\n")[0],
   }));
-const { specs } = readSpectra(root, specDir);
+const { specs } = readSpectra(root, specDir, readOpts);
 // 素材清單（檔名有「素材」的 CSV）：美術要做、企劃要確認、要放進遊戲的
 const content = indexContent(root, cfg.content_dirs || ["docs/企劃"]);
 const sheet = content.find(f => f.ext === "csv" && /素材|asset/i.test(f.name));
@@ -182,7 +189,10 @@ const assets = sheet ? { path: sheet.path, ...assetSummary(readFileSync(join(roo
 const repoInfo = await gh("").catch(() => ({}));
 const data = {
   generatedAt: new Date().toISOString(),
-  repo, repoUrl, specDir, private: !!repoInfo.private,
+  repo, repoUrl, specDir,
+  changesDir,
+  flow: planning ? { mode: "planning", stages: PLAN_STAGES } : { mode: "game" },
+  private: !!repoInfo.private,
   branch: process.env.GITHUB_REF_NAME && !process.env.GITHUB_REF_NAME.includes("/") ? process.env.GITHUB_REF_NAME : "main",
   contentDirs: cfg.content_dirs || ["docs/企劃"],
   content, assets,
@@ -196,4 +206,4 @@ const data = {
 mkdirSync("workbench-out", { recursive: true });
 writeFileSync("workbench-out/data.json", JSON.stringify(data, null, 1));
 writeFileSync("workbench-out/changed.txt", changed.join("\n"));
-console.log(`工作台資料：提案 ${changes.length}、規則書 ${specs.length}、需求 ${data.requests.length}、回饋 ${data.feedback.length}`);
+console.log(`工作台資料：提案 ${changes.length}、規則書 ${specs.length}、需求 ${data.requests.length}、回饋 ${data.feedback.length}${planning ? "（企劃文件流）" : ""}`);

@@ -42,7 +42,7 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: ${{ vars.PAGES_PATH || 'web' }}   # 企劃文件流的專案設 PAGES_PATH = .（示意圖在 docs/ 底下）
       - id: deployment
         uses: actions/deploy-pages@v4
 

@@ -113,3 +113,20 @@ test("readSpectra 企劃模式：提案直接放在 docs/提案/<id>，有 plan 
   assert.equal(old.status, "已完成");
   assert.equal(old.date, "2026-09-01");
 });
+
+import { execFileSync } from "node:child_process";
+
+test("local-data：企劃模式的 data.json 有 flow.stages 與 changesDir，提案帶 plan", () => {
+  const root = mkdtempSync(join(tmpdir(), "plan-data-"));
+  mkdirSync(join(root, "docs/提案/game-page-redesign"), { recursive: true });
+  writeFileSync(join(root, "docs/提案/game-page-redesign/proposal.md"), PROPOSAL);
+  writeFileSync(join(root, "docs/提案/game-page-redesign/tasks.md"), TASKS);
+  writeFileSync(join(root, "workbench.config.json"), JSON.stringify({ name: "PlayHorny 平台", flow: "planning", spec_dir: "docs/提案", content_dirs: ["docs/企劃"] }));
+  const out = JSON.parse(execFileSync(process.execPath, ["tools/workbench/local-data.mjs", root], { encoding: "utf8" }));
+  assert.equal(out.flow.mode, "planning");
+  assert.equal(out.flow.stages.length, 7);
+  assert.equal(out.changesDir, "docs/提案");
+  assert.equal(out.name, "PlayHorny 平台");
+  assert.equal(out.changes[0].plan.current, 5);
+  assert.deepEqual(out.requests, []);
+});
