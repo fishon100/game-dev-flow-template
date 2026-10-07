@@ -1,9 +1,9 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610081700";
-import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610081700";
-import { icon as I, hasIcon } from "./icons.js?v=202610081700";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610081800";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610081800";
+import { icon as I, hasIcon } from "./icons.js?v=202610081800";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -435,7 +435,7 @@ function flowDiagram() {
   h += at(1, r, node("t1", "lightbulb", "需求", "需求池、回饋"));
   h += at(2, r, node("t2", "fileText", "AI 寫提案", "為什麼、改什麼、規則差異、需要企劃確認的事", "", "Spectra：/spectra-propose；推上去自動開討論串"));
   h += at(3, r, node("t3", "thumbsUp", "◆ 企劃同意", "看提案＋示意圖；對話中、管理台或 Issue 勾", "ms"));
-  h += at(4, r, node("t4", "code", "製作", "AI 先寫會失敗的測試 → 寫程式 → 測試全過 → 推上 GitHub（自動測試、部署預覽、手機通知）", "", "Spectra：/spectra-apply"));
+  h += at(4, r, node("t4", "code", "製作", "AI 先寫測試→寫程式→測試全過→推上 GitHub，自動測試、部署預覽、手機通知", "", "Spectra：/spectra-apply"));
   h += at(5, r, node("t5", "flask", "試玩驗收", "收到通知後，企劃／QA 在手機照試玩清單試；🔴🟡🟢 回饋", "", "Spectra：/spectra-verify"));
   h += at(6, r, node("t6", "archive", "規則併回", "AI 把規則併回規則書、寫開發日誌", "", "Spectra：/spectra-archive"));
   h += at(7, r, node("t7", "checkCircle", "完成", "提案搬到 archive，討論串自動關閉"));
@@ -1275,7 +1275,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610081700"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610081800"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}
