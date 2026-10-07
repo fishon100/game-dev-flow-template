@@ -60,3 +60,11 @@ test("狀態：目前階段的名稱；全部勾完＝待歸檔；archive＝已�
   assert.equal(planStatus(true, p), "已完成");
   assert.equal(PLAN_STAGES.find(s => s.n === 4).milestone, "M1");
 });
+
+test("CRLF 的 tasks.md（Windows）結果跟 LF 一樣", () => {
+  const p = parseStages(TASKS.replace(/\n/g, "\r\n"));
+  assert.equal(p.current, 5);
+  assert.equal(p.total, 10);
+  assert.equal(p.done, 5);
+  assert.equal(p.milestones.M1.note, "2026-10-07，需求會議");
+});

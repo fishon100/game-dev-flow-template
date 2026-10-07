@@ -23,6 +23,7 @@ export function sections(md) {
 
 /** 任務清單：總數、完成數、企劃是否同意（0.1）、同意的註記 */
 export function parseTasks(md) {
+  md = md.replace(/\r\n/g, "\n");
   const items = [...md.matchAll(/^- \[( |x|X)\] (.*)$/gm)].map(m => ({ done: m[1] !== " ", text: m[2].trim() }));
   const approvalItem = items.find(t => /^0\.1 /.test(t.text));
   const work = items.filter(t => t !== approvalItem);
@@ -63,7 +64,7 @@ export const MILESTONE_RE = /^(M\d)\s+(.*?)(?:（([^）]*)）)?\s*$/;
 export function parseStages(md) {
   const stages = [];
   let st = null, lane = null;
-  for (const line of md.split("\n")) {
+  for (const line of md.split(/\r?\n/)) {
     const h2 = line.match(/^##\s+(\d+)\.\s*(.+?)\s*$/);
     if (h2) { st = { n: +h2[1], title: h2[2].replace(/\s*◆\s*$/, ""), lanes: [] }; lane = null; stages.push(st); continue; }
     const h3 = line.match(/^###\s+(.+?)\s*$/);
