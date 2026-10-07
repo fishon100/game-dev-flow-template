@@ -1,9 +1,9 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610081500";
-import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610081500";
-import { icon as I, hasIcon } from "./icons.js?v=202610081500";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610081600";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610081600";
+import { icon as I, hasIcon } from "./icons.js?v=202610081600";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -515,8 +515,81 @@ function drawFlowLinks(lanes) {
     .map(([k, c]) => `<marker id="ar-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:${c}"/></marker>`).join("");
   svg.innerHTML = `<defs>${arrows}</defs>` + paths.join("");
 }
+// ===== 各部門流程（可展開的部門泳道）：列＝部門、欄＝主圖同一組階段；主圖不變，這是細項 =====
+// 連線種類：on＝正常推進、soft＝交付給另一列（灰點線）、back＝回去修改（紅虛線）
+const DEPT_FLOWS = {
+  planning: {
+    lanes: [["企劃", "brand"], ["美術", "art"], ["後端", "tech"], ["前端", "tech"], ["QA", "qa"]],
+    nodes: [
+      { id: "p1", lane: "企劃", col: 1, t: "需求", s: "需求池、回饋" }, { id: "p2", lane: "企劃", col: 2, t: "寫企劃書", s: "Notion，AI 協助" }, { id: "p3", lane: "企劃", col: 3, t: "示意圖＋SPEC", s: "AI 依企劃書做" },
+      { id: "p4", lane: "企劃", col: 4, t: "M1 需求確認", s: "需求會議", cls: "ms" }, { id: "p5", lane: "企劃", col: 5, t: "M2 規格確認", s: "美術九成後補 SPEC", cls: "ms" }, { id: "p6", lane: "企劃", col: 6, t: "處理回饋", s: "改文件、退回該階段" }, { id: "p7", lane: "企劃", col: 7, t: "歸檔", s: "之後的回饋另開優化案" },
+      { id: "a5", lane: "美術", col: 5, t: "視覺稿", s: "完成九成通知企劃" },
+      { id: "b5", lane: "後端", col: 5, t: "建構", s: "開工單 → 完成" }, { id: "b6", lane: "後端", col: 6, t: "修回饋", s: "" },
+      { id: "f5", lane: "前端", col: 5, t: "結構與邏輯", s: "M2 後補介面細節" }, { id: "f6", lane: "前端", col: 6, t: "修回饋", s: "" },
+      { id: "q6", lane: "QA", col: 6, t: "逐條驗收", s: "SPEC 驗收條件 → 回饋" },
+    ],
+    links: [["p1", "p2"], ["p2", "p3"], ["p3", "p4"], ["p4", "p5"], ["p4", "a5", "soft"], ["p4", "b5", "soft"], ["p4", "f5", "soft"], ["a5", "p5", "soft"], ["p5", "f5", "soft"], ["b5", "q6", "soft"], ["f5", "q6", "soft"], ["q6", "p6", "back", "回饋"], ["p6", "b6", "soft"], ["p6", "f6", "soft"], ["b6", "q6", "soft"], ["p6", "p7"], ["p6", "p3", "back", "退回改文件、取消里程碑"]],
+  },
+  game: {
+    lanes: [["企劃", "brand"], ["程式", "tech"], ["美術", "art"], ["劇本", "story"], ["數值／關卡", "num"], ["QA", "qa"]],
+    nodes: [
+      { id: "g1", lane: "企劃", col: 1, t: "需求", s: "需求、回饋" }, { id: "g2", lane: "企劃", col: 2, t: "AI 寫提案", s: "企劃看需要確認的事", cls: "ai" }, { id: "g3", lane: "企劃", col: 3, t: "企劃同意", s: "對話中或管理台", cls: "ms" },
+      { id: "g5", lane: "企劃", col: 5, t: "處理回饋", s: "改提案、再同意一次" }, { id: "g6", lane: "企劃", col: 6, t: "驗收通過", s: "說一聲就好" }, { id: "g7", lane: "企劃", col: 7, t: "規則併回", s: "AI 做、寫開發日誌", cls: "ai" }, { id: "g8", lane: "企劃", col: 8, t: "歸檔", s: "" },
+      { id: "d3", lane: "程式", col: 3, t: "技術確認", s: "看交接文件", cls: "ms" }, { id: "d4", lane: "程式", col: 4, t: "AI 寫測試 → 程式 → 上線", s: "程式協助調整", cls: "ai" }, { id: "d7", lane: "程式", col: 7, t: "審 PR、合併", s: "" },
+      { id: "m4", lane: "美術", col: 4, t: "素材交件", s: "企劃採用 → 換上" },
+      { id: "s2", lane: "劇本", col: 2, t: "劇本／文案", s: "名詞表" }, { id: "s4", lane: "劇本", col: 4, t: "對白、文字", s: "交 AI 放進去" },
+      { id: "n4", lane: "數值／關卡", col: 4, t: "數值表、關卡", s: "xlsx 匯入" },
+      { id: "t6", lane: "QA", col: 6, t: "試玩清單", s: "🔴🟡🟢 回饋" },
+    ],
+    links: [["g1", "g2"], ["g2", "g3"], ["g3", "d3", "soft"], ["d3", "d4"], ["m4", "d4", "soft"], ["s4", "d4", "soft"], ["n4", "d4", "soft"], ["d4", "t6", "soft"], ["d4", "d7", "soft"], ["t6", "g5", "back", "🔴"], ["g5", "g2", "back", "改提案、重新同意"], ["g5", "g6"], ["g6", "g7"], ["g7", "g8"]],
+  },
+};
+// 部門泳道的 HTML：欄數跟主圖一樣（平台 7、遊戲 8），所以上下對齊
+function deptSwimlaneHtml() {
+  const spec = DEPT_FLOWS[isPlan() ? "planning" : "game"], ST = isPlan() ? planStages() : STAGES;
+  let r = 1, h = "";
+  for (let i = 0; i <= ST.length; i++) h += `<div class="col-line" style="grid-column:${i + 1}"></div>`;
+  h += `<div style="grid-column:1;grid-row:${r}"></div>` + ST.map(s => `<div class="head" style="grid-column:${s.n + 1};grid-row:${r}"><span class="num">${s.n}</span><b>${esc(s.label)}</b></div>`).join("");
+  for (const [name, cls] of spec.lanes) {
+    r++;
+    h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill dept-${cls}">${esc(name)}</span></div>`;
+    for (const n of spec.nodes.filter(n => n.lane === name)) h += `<div class="cell" style="grid-column:${n.col + 1};grid-row:${r}"><div class="node ${n.cls || ""}" data-dept="${n.id}"><b>${esc(n.t)}</b>${n.s ? `<small>${esc(n.s)}</small>` : ""}</div></div>`;
+  }
+  const open = store.get("console:deptOpen") === "1";
+  return `<details class="dept" id="dept" ${open ? "open" : ""}><summary>${I("users", 15)}各部門流程<span class="muted">（列＝部門、欄＝階段；展開看誰在哪一步做什麼）</span></summary>
+    <div class="flow-wrap"><div class="flow ${isPlan() ? "plan" : ""} dept-grid" id="deptFlow">${h}<svg class="links" id="deptLinks"></svg></div></div>
+    <div class="legend"><span><span class="lg" style="background:var(--accent);border-color:var(--accent)"></span>正常推進</span><span><span class="lg" style="border:1px dotted var(--line-strong);background:transparent"></span>交付給另一列</span><span><span class="lg" style="border:1px dashed var(--bad);background:transparent"></span>回去修改</span><span><span class="node ms" style="width:16px;height:16px;min-height:0;padding:0"></span>里程碑</span></div></details>`;
+}
+// 部門泳道的連線：同列往右＝直線；同列往左＝繞上方；跨列＝先垂直再水平
+function drawDeptLinks() {
+  const flow = $("#deptFlow"), svg = $("#deptLinks"), det = $("#dept"); if (!flow || !svg || !det?.open) return;
+  const spec = DEPT_FLOWS[isPlan() ? "planning" : "game"], box = flow.getBoundingClientRect();
+  const pos = id => { const el = flow.querySelector(`[data-dept="${CSS.escape(id)}"]`); if (!el) return null; const r = el.getBoundingClientRect(); return { l: r.left - box.left, r: r.right - box.left, t: r.top - box.top, b: r.bottom - box.top, cx: (r.left + r.right) / 2 - box.left, cy: (r.top + r.bottom) / 2 - box.top }; };
+  const R = 10, out = [];
+  for (const [a, b, type = "on", label = ""] of spec.links) {
+    const A = pos(a), B = pos(b); if (!A || !B) continue;
+    const tcls = type === "back" ? "back" : "";
+    if (Math.abs(A.cy - B.cy) < 4) {
+      if (B.l > A.r) { out.push(`<path class="${type}" d="M${A.r} ${A.cy}H${B.l}"/>`); if (label) out.push(`<text class="${tcls}" text-anchor="middle" x="${(A.r + B.l) / 2}" y="${A.cy - 6}">${esc(label)}</text>`); }
+      else { const y = A.t - 16; out.push(`<path class="${type}" d="M${A.cx} ${A.t}V${y + R}Q${A.cx} ${y} ${A.cx - R} ${y}H${B.cx + R}Q${B.cx} ${y} ${B.cx} ${y + R}V${B.t}"/>`); if (label) out.push(`<text class="${tcls}" text-anchor="middle" x="${(A.cx + B.cx) / 2}" y="${y - 4}">${esc(label)}</text>`); }
+    } else if (B.cy > A.cy) {
+      if (B.l > A.cx + 20) out.push(`<path class="${type}" d="M${A.cx} ${A.b}V${B.cy - R}Q${A.cx} ${B.cy} ${A.cx + R} ${B.cy}H${B.l}"/>`);
+      else out.push(`<path class="${type}" d="M${A.cx} ${A.b}V${B.t}"/>`);
+      if (label) out.push(`<text class="${tcls}" x="${A.cx + 6}" y="${(A.b + B.t) / 2 + 4}">${esc(label)}</text>`);
+    } else {
+      const y = B.b + 14;
+      out.push(`<path class="${type}" d="M${A.cx} ${A.t}V${y + R}Q${A.cx} ${y} ${A.cx - R} ${y}H${B.cx + R}Q${B.cx} ${y} ${B.cx} ${y - R}V${B.b}"/>`);
+      if (label) out.push(`<text class="${tcls}" text-anchor="middle" x="${(A.cx + B.cx) / 2}" y="${y - 4}">${esc(label)}</text>`);
+    }
+  }
+  svg.setAttribute("viewBox", `0 0 ${flow.scrollWidth} ${flow.scrollHeight}`);
+  const arrows = [["on", "var(--accent)"], ["soft", "var(--line-strong)"], ["back", "var(--bad)"]]
+    .map(([k, c]) => `<marker id="dar-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:${c}"/></marker>`).join("");
+  svg.innerHTML = `<defs>${arrows}</defs>` + out.join("");
+}
+document.addEventListener("toggle", e => { if (e.target.id === "dept") { store.set("console:deptOpen", e.target.open ? "1" : "0"); if (e.target.open) drawDeptLinks(); } }, true);
 let flowLanes = [];
-const redrawFlowLinks = () => (isPlan() ? drawFlowLinksPlan : drawFlowLinks)(flowLanes);
+const redrawFlowLinks = () => { (isPlan() ? drawFlowLinksPlan : drawFlowLinks)(flowLanes); drawDeptLinks(); };
 addEventListener("resize", () => { if (S.view === "flow" && S.flowMode === "diagram") redrawFlowLinks(); });
 
 function flowTreeHtml() {
@@ -549,9 +622,9 @@ V.flow = () => {
   if (S.flowMode === "tree") return vh("workflow", "流程圖", "專案 → 階段 → 提案 → 文件與任務", seg) + flowTreeHtml();
   const { html, lanes } = isPlan() ? flowDiagramPlan() : flowDiagram();
   flowLanes = lanes;
-  setTimeout(() => (isPlan() ? drawFlowLinksPlan : drawFlowLinks)(lanes), 0);
+  setTimeout(() => { (isPlan() ? drawFlowLinksPlan : drawFlowLinks)(lanes); drawDeptLinks(); }, 0);
   const sub = isPlan() ? "上方兩組標準流程：① 介面向（含回去修改的兩條線：製作或驗收中有回饋就退回改文件、再確認一次；已歸檔的另開優化案）、② 系統向。下方每張進行中的提案一條泳道，◆ 是里程碑（M1 需求確認、M2 規格確認）" : "上方是兩條標準流程（企劃提案、技術交接）；下方每張進行中的提案一條泳道，亮色格子＝目前在這一步";
-  return vh("workflow", "流程圖", sub, seg) + html +
+  return vh("workflow", "流程圖", sub, seg) + html + deptSwimlaneHtml() +
     `<div class="legend"><span><span class="node done" style="width:16px;height:16px">${I("check", 10)}</span>完成</span><span><span class="lg" style="background:var(--accent);border-color:var(--accent)"></span>目前這一步（點開看明細）</span><span><span class="node todo"></span>還沒到</span>${isPlan() ? "" : `<span><span class="lg" style="background:var(--accent-soft);border-color:var(--accent-line)"></span>Spectra 指令（AI 執行）</span>`}</div>`;
 };
 V.tree = () => { S.flowMode = "tree"; S.view = "flow"; return V.flow(); };
@@ -1201,7 +1274,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610081500"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610081600"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}

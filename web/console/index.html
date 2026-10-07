@@ -257,6 +257,25 @@ table.t { width: 100%; border-collapse: collapse; }
 .node.done .ico { color: #fff; margin: 0; }
 .node.todo { min-height: 0; width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--panel); box-shadow: none; }
 .node.ghost { border-style: dashed; background: transparent; box-shadow: none; }
+/* 各部門流程（可展開的部門泳道） */
+details.dept { margin: 14px 0 4px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); }
+details.dept summary { cursor: pointer; padding: 10px 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+details.dept summary .muted { font-weight: 400; }
+details.dept[open] summary { border-bottom: 1px solid var(--line); }
+details.dept .flow-wrap { border: 0; border-radius: 0 0 var(--r-lg) var(--r-lg); }
+details.dept .legend { padding: 8px 14px 12px; }
+.flow.dept-grid .head { padding-bottom: 34px; }
+.flow.dept-grid .cell { min-height: 96px; }
+.flow.dept-grid .cell > .node { height: 76px; max-width: 150px; }
+.node.ms { background: var(--warn-soft); border-color: var(--warn); }
+.node.ai { background: color-mix(in srgb, var(--line) 45%, var(--panel)); }
+.pill.dept-brand { background: var(--accent); color: var(--accent-ink); }
+.pill.dept-tech { background: var(--violet); color: var(--panel); }
+.pill.dept-art { background: #c2654a; } .pill.dept-story { background: #9b3b7a; } .pill.dept-num { background: #2f7d5f; } .pill.dept-qa { background: #8a6d1f; }
+.links path.soft { stroke: var(--line-strong); stroke-dasharray: 3 4; marker-end: url(#dar-soft); }
+.links path.back { stroke: var(--bad); stroke-dasharray: 5 4; marker-end: url(#dar-back); }
+#deptLinks path.on { marker-end: url(#dar-on); }
+.links text.back { fill: var(--bad); }
 .node.clickable { cursor: pointer; } .node.clickable:hover { border-color: var(--accent); }
 .flow svg.links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
 .links path { fill: none; stroke: var(--line-strong); stroke-width: 2; }
@@ -442,6 +461,6 @@ dialog::backdrop { background: rgb(10 10 20 / .45); }
 </div>
 <dialog id="dlg"></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=202610081500"></script>
+<script type="module" src="app.js?v=202610081600"></script>
 </body>
 </html>
