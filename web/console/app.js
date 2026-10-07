@@ -1,9 +1,9 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow } from "./github.js?v=202610072000";
-import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610072000";
-import { icon as I, hasIcon } from "./icons.js?v=202610072000";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610072100";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610072100";
+import { icon as I, hasIcon } from "./icons.js?v=202610072100";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -18,6 +18,28 @@ const S = { projects: [], repo: "", data: null, view: "overview", arg: "", treeF
 const raw = p => `https://raw.githubusercontent.com/${S.repo}/${S.data?.branch || "main"}/${encPath(p)}`;
 const blob = p => `${S.data.repoUrl}/blob/${S.data.branch || "main"}/${encPath(p)}`;
 const tree = p => `${S.data.repoUrl}/tree/${S.data.branch || "main"}/${encPath(p)}`;
+// 私人專案：raw 網址沒登入看不到，文字與圖片都改用登入碼走 API（data.private 由同步程式寫入）
+const isPriv = () => !!S.data?.private;
+async function getText(path) {
+  const r = isPriv() ? await rawFetch(S.repo, path, S.data.branch) : await fetch(raw(path) + `?t=${Date.now()}`);
+  if (!r.ok) throw new Error(r.status);
+  return r.text();
+}
+const MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" };
+const PIXEL = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+// 圖片的 src：公開專案直接用 raw 網址；私人專案先放空白，之後用登入碼讀成 blob 再換上
+const imgSrc = p => isPriv() ? `src="${PIXEL}" data-ghimg="${esc(p)}"` : `src="${raw(p)}"`;
+const imgCache = new Map();
+async function hydrateImgs() {
+  for (const img of document.querySelectorAll("img[data-ghimg]")) {
+    const p = img.dataset.ghimg, key = S.repo + ":" + p; img.removeAttribute("data-ghimg");
+    try {
+      if (!imgCache.has(key)) { const r = await rawFetch(S.repo, p, S.data.branch); imgCache.set(key, URL.createObjectURL(new Blob([await r.arrayBuffer()], { type: MIME[p.split(".").pop().toLowerCase()] || "application/octet-stream" }))); }
+      img.src = imgCache.get(key);
+    } catch { img.alt = "（私人專案：登入後才看得到圖片）"; }
+  }
+}
+new MutationObserver(() => { if (document.querySelector("img[data-ghimg]")) hydrateImgs(); }).observe(document.documentElement, { subtree: true, childList: true });
 
 // ---------- 內容分類 ----------
 const IMG = /^(png|jpe?g|gif|webp|svg)$/;
@@ -27,11 +49,15 @@ const CATS = [
   { key: "world", label: "世界觀", ic: "globe", test: f => /世界|街區|world/i.test(f.path) },
   { key: "terms", label: "名詞", ic: "tag", test: f => /名詞|命名|term|glossary/i.test(f.name) },
   { key: "numbers", label: "數值", ic: "chart", test: f => /數值|tuning|balance/i.test(f.name) },
+  { key: "briefs", label: "企劃書", ic: "fileText", test: f => /企劃書/.test(f.path) },   // 需求定義（為什麼做、做什麼、什麼情境）
+  { key: "mockups", label: "示意圖", ic: "layout", test: f => f.ext === "html" && !/規格書/.test(f.path) },   // 介面展示（AI 依企劃書做的 html 畫面）
+  { key: "specsheets", label: "規格書", ic: "list", test: f => f.ext === "html" && /規格書/.test(f.path) },   // 元件規格（標註在示意圖上）
   { key: "plans", label: "規劃書", ic: "fileText", test: f => /規劃書|主架構|規劃|plan/i.test(f.path) },
   { key: "records", label: "紀錄", ic: "history", test: f => /日誌|回饋|紀錄|log/i.test(f.name) },
 ];
 const isAsset = f => IMG.test(f.ext) || /^(mp3|ogg|wav)$/.test(f.ext) || /媒體庫|美術|音樂|音效|素材|assets/i.test(f.path);
 function catOf(f) {
+  if (f.ext === "html") return /規格書/.test(f.path) ? "specsheets" : "mockups";
   if (f.ext !== "md") return null;
   if (/媒體庫|素材/.test(f.path) && !/美術風格/.test(f.name)) return "assets";
   return (CATS.find(c => c.test(f)) || { key: "other" }).key;
@@ -104,6 +130,15 @@ function qaHtml(c) {
     ${all ? `<p class="ok-t">${I("checkCircle", 14)}全部通過：企劃確認後對 AI 說「${esc(c.id)} 驗收通過」。</p>` : `<p class="muted">沒問題就勾；有問題按「不通過」，寫下哪裡怪（可附截圖），會自動開一則 🔴 必修回饋，AI 修好後再試一次。</p>`}
   </section>`;
 }
+// 提案的文件組合：企劃書（需求定義）、示意圖（介面展示）；介面向的提案才有示意圖
+function docsRow(c) {
+  if (!c.brief && !c.mockups?.length && c.docs !== "介面向") return "";
+  const name = p => p.split("/").pop().replace(/.(md|html)$/, "");
+  return `<div class="docs-row"><span class="chip ${c.docs === "介面向" ? "c-info" : ""}" title="${c.docs === "介面向" ? "介面向：企劃書＋示意圖＋規格書" : "系統向：只有企劃書"}">${I("files", 12)}${esc(c.docs)}</span>
+    ${c.brief ? `<button class="btn sm" data-opendoc="${esc(c.brief)}">${I("fileText", 14)}企劃書</button>` : ""}
+    ${(c.mockups || []).map(p => `<button class="btn sm" data-opendoc="${esc(p)}" title="${esc(p)}">${I("layout", 14)}示意圖：${esc(name(p))}</button>`).join("")}
+    ${c.docs === "介面向" && !c.mockups?.length ? `<span class="muted">還沒有示意圖</span>` : ""}</div>`;
+}
 function changeDetail(c) {
   const folder = `${S.data.specDir}/changes/${c.archived ? "archive/" : ""}${c.folder}`;
   const groups = taskTree(c.tasks.groups, true);
@@ -111,6 +146,7 @@ function changeDetail(c) {
     <div class="row">${chip(c.status)}${kindChip(c)}${c.breaking ? '<span class="chip c-bad">BREAKING</span>' : ""}<span class="muted" style="font-family:var(--mono)">${esc(c.id)}${c.date ? "・" + esc(c.date) : ""}</span></div>
     <h2 style="margin:10px 0 0;font-size:18px;font-weight:650">${esc(c.title)}</h2>
     ${chainHtml(c)}
+    ${docsRow(c)}
     <div class="row" style="margin-bottom:14px">
       ${c.status === "待同意" ? approveBtn(c) : ""}
       ${["已同意", "製作中"].includes(c.status) ? sayBtn(`做 ${c.id}`, "") : c.status === "待驗收" ? sayBtn(`${c.id} 驗收通過`, "") : ""}
@@ -220,7 +256,7 @@ async function loadAssetTodo() {
   S.assetTodo = { repo, sum: null };
   if (!sheet) return;
   try {
-    S.assetTodo.sum = assetCounts(parseCsv(await (await fetch(raw(sheet.path))).text()));
+    S.assetTodo.sum = assetCounts(parseCsv(await getText(sheet.path)));
     if (repo === S.repo && S.view === "overview") render();
   } catch {}
 }
@@ -393,18 +429,18 @@ V.specs = () => {
 };
 
 function docList(files, cur) {
-  return `<div class="flist">${files.map(f => `<button data-doc="${esc(f.path)}" aria-current="${cur === f.path}">${I(f.ext === "csv" ? "table" : "fileText", 15)}<span><b>${esc(f.title)}</b><small>${esc(f.path.replace(/^docs\/企劃\//, ""))}</small></span></button>`).join("") || `<div class="empty">沒有文件</div>`}</div>`;
+  return `<div class="flist">${files.map(f => `<button data-doc="${esc(f.path)}" aria-current="${cur === f.path}">${I(f.ext === "csv" ? "table" : f.ext === "html" ? "layout" : "fileText", 15)}<span><b>${esc(f.title)}</b><small>${esc(f.path.replace(/^docs\/企劃\//, ""))}</small></span></button>`).join("") || `<div class="empty">沒有文件</div>`}</div>`;
 }
 V.content = () => {
   const cat = CATS.find(c => c.key === S.arg) || { label: "其他", ic: "fileText" };
   const files = (S.data.content || []).filter(f => catOf(f) === S.arg);
   const cur = S.doc && files.some(f => f.path === S.doc) ? S.doc : files[0]?.path;
   setTimeout(() => cur && openDoc(cur, "#reader"), 0);
-  return vh(cat.ic, cat.label, `${files.length} 份`, `<button class="btn" data-newdoc="${esc(S.arg)}">${I("plus", 15)}新文件</button>`) +
+  return vh(cat.ic, cat.label, `${files.length} 份`, ["mockups", "specsheets"].includes(S.arg) ? "" : `<button class="btn" data-newdoc="${esc(S.arg)}">${I("plus", 15)}新文件</button>`) +
     `<div class="split">${docList(files, cur)}<div class="doc" id="reader"><div class="muted">選一份文件</div></div></div>`;
 };
 V.files = () => {
-  const files = (S.data.content || []).filter(f => f.ext === "md" || f.ext === "csv");
+  const files = (S.data.content || []).filter(f => f.ext === "md" || f.ext === "csv" || f.ext === "html");
   const cur = S.doc && files.some(f => f.path === S.doc) ? S.doc : files[0]?.path;
   setTimeout(() => cur && openDoc(cur, "#reader"), 0);
   return vh("files", "全部文件", esc((S.data.contentDirs || []).join("、"))) + `<div class="split">${docList(files, cur)}<div class="doc" id="reader"></div></div>`;
@@ -420,7 +456,7 @@ V.assets = () => {
     `${sheets.length ? `<div class="card"><h3>${I("table", 14)}素材進度</h3>
       <p class="muted flowline">${["待製作", "交件", "待確認", "採用／退回", "放進遊戲"].map((s, i) => `${i ? I("chevronRight", 12) : ""}<span>${s}</span>`).join("")}<span class="sep">｜</span>美術做好按「交件」；企劃看過按「採用」或「退回（附意見）」；採用的由 AI 在「同步」時放進遊戲。</p>
       <div id="assetSheet" class="muted">讀取中…</div></div>` : ""}
-    <div class="card"><h3>${I("image", 14)}圖片</h3>${imgs.length ? `<div class="gallery">${imgs.map(f => `<div class="tile" data-img="${esc(f.path)}"><div class="im"><img loading="lazy" src="${raw(f.path)}" alt="${esc(f.title)}"></div><p>${esc(f.name)}</p></div>`).join("")}</div>` : `<div class="empty">還沒有圖片</div>`}</div>
+    <div class="card"><h3>${I("image", 14)}圖片</h3>${imgs.length ? `<div class="gallery">${imgs.map(f => `<div class="tile" data-img="${esc(f.path)}"><div class="im"><img loading="lazy" ${imgSrc(f.path)} alt="${esc(f.title)}"></div><p>${esc(f.name)}</p></div>`).join("")}</div>` : `<div class="empty">還沒有圖片</div>`}</div>
     ${audio.length ? `<div class="card"><h3>${I("volume", 14)}聲音</h3><ul class="list">${audio.map(f => `<li><div class="g">${esc(f.name)}</div><audio controls preload="none" src="${raw(f.path)}"></audio></li>`).join("")}</ul></div>` : ""}
     <div class="card"><h3>${I("fileText", 14)}素材清單與風格指南</h3><div class="row">${docs.map(f => `<button class="btn" data-doc-detail="${esc(f.path)}">${I("fileText", 14)}${esc(f.title)}</button>`).join("") || `<span class="muted">沒有</span>`}</div></div>`;
 };
@@ -430,7 +466,7 @@ async function loadAssetSheet(path, fresh = false) {
   try {
     const key = S.repo + ":" + path;
     if (fresh || S.assetText?.key !== key) {
-      const text = canWrite() ? (await readFile(S.repo, path, S.data.branch)).text : await (await fetch(raw(path) + `?t=${Date.now()}`)).text();
+      const text = canWrite() ? (await readFile(S.repo, path, S.data.branch)).text : await getText(path);
       S.assetText = { key, path, text };
     }
     renderAssetSheet(el, path, S.assetText.text);
@@ -447,7 +483,7 @@ function renderAssetSheet(el, path, text) {
   const cnt = s => body.filter(x => x.r[iS] === s).length;
   const cols = head.map((h, i) => [h, i]).filter(([h]) => !/提示詞|Figma|^交件$|^意見$/.test(h));
   const files = r => (iD >= 0 ? r[iD] || "" : "").split(/[；;]/).map(s => s.trim()).filter(Boolean);
-  const sent = r => `${files(r).map(p => IMG.test(p.split(".").pop().toLowerCase()) ? `<button class="thumb" data-img="${esc(p)}" title="${esc(p)}"><img loading="lazy" src="${raw(p)}" alt=""></button>` : `<a href="${blob(p)}" target="_blank" rel="noopener">${esc(p.split("/").pop())}</a>`).join("")}${iF >= 0 && r[iF] ? `<div class="note">${I("message", 12)}${esc(r[iF])}</div>` : ""}`;
+  const sent = r => `${files(r).map(p => IMG.test(p.split(".").pop().toLowerCase()) ? `<button class="thumb" data-img="${esc(p)}" title="${esc(p)}"><img loading="lazy" ${imgSrc(p)} alt=""></button>` : `<a href="${blob(p)}" target="_blank" rel="noopener">${esc(p.split("/").pop())}</a>`).join("")}${iF >= 0 && r[iF] ? `<div class="note">${I("message", 12)}${esc(r[iF])}</div>` : ""}`;
   const act = ({ r, idx }) => { const s = (r[iS] || "").trim();
     if (s === "待確認") return `<button class="btn sm ok" data-aok="${idx}">${I("check", 13)}採用</button><button class="btn sm" data-aback="${idx}">${I("x", 13)}退回</button>`;
     if (s === "已採用") return `<span class="muted">等 AI 放進遊戲</span>`;
@@ -493,7 +529,7 @@ async function doAssetSend(idx) {
 async function doAssetReview(idx, ok) {
   const { name, r, head } = assetRow(idx); if (!name) return;
   const shots = (r[head.indexOf("交件")] || "").split(/[；;]/).map(s => s.trim()).filter(p => p && IMG.test(p.split(".").pop().toLowerCase()));
-  const preview = shots.length ? `<div class="thumbs">${shots.map(p => `<img src="${raw(p)}" alt="">`).join("")}</div>` : "";
+  const preview = shots.length ? `<div class="thumbs">${shots.map(p => `<img ${imgSrc(p)} alt="">`).join("")}</div>` : "";
   const v = await dialog(ok ? `採用：${name}` : `退回：${name}`, `${canWrite() ? target() : ""}${preview}${ok ? `<p>確定採用 <b>${esc(name)}</b>？採用後，對 AI 說「同步」就會把它放進遊戲。</p>` : `<label class="fld"><span>要怎麼改（美術會在待辦看到）</span><textarea name="why" required placeholder="例：眼睛再大一點，顏色跟第 1 區的招牌一樣亮"></textarea></label>`}${canWrite() ? "" : `<p class="muted">沒有登入碼：按下去會複製一句話，貼到 Claude，AI 會幫你改清單。</p>`}`, [["", "取消"], ["ok", ok ? "採用" : "退回", ok ? "ok" : "primary"]]);
   if (v !== "ok") return;
   const why = ok ? "" : $("#dlg form").why.value.trim();
@@ -601,6 +637,14 @@ V.help = () => vh("help", "說明") + `<div class="grid2" style="margin-top:0"><
   <div class="card"><h3>${I("book", 14)}名詞小抄</h3><dl class="gloss">${GLOSSARY.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div></div>`;
 
 // ---------- 文件閱讀 ----------
+// ---------- 示意圖（html）：在沙盒裡顯示，可切手機／電腦寬度、開新視窗看完整畫面 ----------
+const mockupHtml = path => `<div class="mock-bar"><div class="seg" role="group" aria-label="畫面寬度"><button data-mockw="390" aria-pressed="${S.mockW !== "full"}">${I("phone", 14)}手機</button><button data-mockw="full" aria-pressed="${S.mockW === "full"}">${I("layout", 14)}電腦</button></div><span class="muted">示意圖裡的按鈕都可以點（沙盒，不會影響管理台）</span><span class="spacer"></span><button class="btn sm" data-mockopen>${I("external", 14)}開新視窗看</button></div><div class="mock-stage ${S.mockW === "full" ? "full" : ""}"><iframe class="mock" sandbox="allow-scripts allow-popups allow-modals allow-forms" referrerpolicy="no-referrer" title="示意圖"></iframe></div>`;
+function mountMockup(el, text) { S.mockText = text; const f = el.querySelector("iframe.mock"); if (f) f.srcdoc = text; }
+function openMockupWindow() {
+  const w = window.open("", "_blank"); if (!w) { toast("瀏覽器擋住了新視窗：請允許彈出視窗", 6000); return; }
+  w.document.write('<!doctype html><meta charset="utf-8"><title>示意圖</title><style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%}</style><iframe sandbox="allow-scripts allow-popups allow-modals allow-forms"></iframe>');
+  w.document.close(); w.document.querySelector("iframe").srcdoc = S.mockText || ""; w.opener = null;
+}
 const resolvePath = (base, rel) => { const parts = base.split("/").slice(0, -1); for (const seg of decodeURIComponent(rel).split("/")) { if (seg === "..") parts.pop(); else if (seg && seg !== ".") parts.push(seg); } return parts.join("/"); };
 async function openDoc(path, target) {
   const el = typeof target === "string" ? $(target) : target; if (!el) return;
@@ -612,13 +656,14 @@ async function openDoc(path, target) {
     let text;
     const cached = S.saved?.[`${S.repo}:${path}`]; // 剛存過的檔案，raw 網址可能還是舊的：10 分鐘內先用剛存的內容
     if (cached && Date.now() - cached.at < 10 * 60000) text = cached.text;
-    else { const r = await fetch(raw(path) + `?t=${Date.now()}`); if (!r.ok) throw new Error(r.status); text = await r.text(); }
+    else text = await getText(path);
     if (req !== S.docReq) return;
     const editable = path.endsWith(".md"); // 沒登入時「編輯」會打開 GitHub 編輯頁
     // 同步工具在檔頭加的說明行：不當內文顯示，改成檔頭的小標籤
     const synced = /^> 🔁 [^\n]*\n\n?/m.test(text);
     if (synced) text = text.replace(/^> 🔁 [^\n]*\n\n?/m, "");
     const head = `<div class="dochead"><span class="path" title="${esc(path)}">${esc(path)}</span>${synced ? `<span class="chip" title="正本在 Obsidian，和這裡雙向同步">${I("refresh", 12)}與 Obsidian 同步</span>` : ""}${editable ? `<button class="btn sm" data-edit="${esc(path)}">${I("edit", 14)}編輯</button>` : ""}<a class="btn sm" href="${blob(path)}" target="_blank" rel="noopener">${I("external", 14)}GitHub</a></div>`;
+    if (path.endsWith(".html")) { el.innerHTML = head + mockupHtml(path); mountMockup(el, text); return; }
     if (path.endsWith(".csv")) {
       const rows = parseCsv(text);
       el.innerHTML = head + `<div class="tablewrap"><table class="t"><thead><tr>${(rows[0] || []).map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.slice(1).filter(r => r.some(Boolean)).map(r => `<tr>${r.map(c => `<td class="pre">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
@@ -627,7 +672,7 @@ async function openDoc(path, target) {
     const md = text.replace(/\r/g, "").replace(/^---\n[\s\S]*?\n---\n/, "");
     const html = window.DOMPurify && window.marked ? DOMPurify.sanitize(marked.parse(md)) : `<pre>${esc(md)}</pre>`;
     el.innerHTML = head + `<div class="md">${html}</div>`;
-    el.querySelectorAll("img[src]").forEach(img => { const s = img.getAttribute("src"); if (!/^(https?:|data:)/.test(s)) img.src = raw(resolvePath(path, s)); });
+    el.querySelectorAll("img[src]").forEach(img => { const s = img.getAttribute("src"); if (!/^(https?:|data:)/.test(s)) { const p = resolvePath(path, s); if (isPriv()) { img.src = PIXEL; img.dataset.ghimg = p; } else img.src = raw(p); } });
     el.querySelectorAll(".md a[href]").forEach(a => {
       const h = a.getAttribute("href");
       if (/^https?:/.test(h)) { a.target = "_blank"; a.rel = "noopener"; return; }
@@ -673,7 +718,7 @@ function render() {
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-go],[data-change],[data-doc],[data-doc-detail],[data-close],[data-tree],[data-proj],[data-img],[data-af],[data-ac],[data-flowmode],.tw,#addBtn");
+  const t = e.target.closest("[data-go],[data-change],[data-doc],[data-doc-detail],[data-close],[data-tree],[data-proj],[data-img],[data-af],[data-ac],[data-flowmode],[data-mockw],[data-mockopen],[data-opendoc],.tw,#addBtn");
   if (!t) return;
   if (t.classList.contains("tw") && !t.classList.contains("leaf")) { e.stopPropagation(); t.closest("li").classList.toggle("closed"); return; }
   if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); return; }
@@ -681,7 +726,10 @@ document.addEventListener("click", e => {
   if (t.dataset.flowmode) { S.flowMode = t.dataset.flowmode; store.set("console:flowMode", S.flowMode); render(); return; }
   if (t.dataset.doc) { if (leaveOk()) openDoc(t.dataset.doc, "#reader"); return; }
   if (t.dataset.docDetail) { if (!leaveOk()) return; showDetail(`<button class="ibtn close" data-close aria-label="關閉">${I("x")}</button><div id="dd"></div>`); openDoc(t.dataset.docDetail, "#dd"); return; }
-  if (t.dataset.img) { const p = t.dataset.img; showDetail(`<button class="ibtn close" data-close aria-label="關閉">${I("x")}</button><h3>${esc(p.split("/").pop())}</h3><img src="${raw(p)}" style="max-width:100%;border-radius:10px;border:1px solid var(--line)" alt=""><div class="row" style="margin-top:12px"><a class="btn" href="${blob(p)}" target="_blank" rel="noopener">${I("external", 14)}GitHub</a><a class="btn" href="${raw(p)}" download>${I("download", 14)}下載</a></div><p class="muted" style="font-family:var(--mono)">${esc(p)}</p>`); return; }
+  if (t.dataset.opendoc) { const p = t.dataset.opendoc, f = (S.data.content || []).find(x => x.path === p); if (!f) { window.open(blob(p), "_blank", "noopener"); return; } if (!leaveOk()) return; S.doc = p; hideDetail(); go("content/" + (catOf(f) || "other")); return; }
+  if (t.dataset.mockw) { S.mockW = t.dataset.mockw === "full" ? "full" : "390"; document.querySelectorAll("[data-mockw]").forEach(b => b.setAttribute("aria-pressed", b === t)); document.querySelector(".mock-stage")?.classList.toggle("full", S.mockW === "full"); return; }
+  if (t.dataset.mockopen !== undefined) { openMockupWindow(); return; }
+  if (t.dataset.img) { const p = t.dataset.img; showDetail(`<button class="ibtn close" data-close aria-label="關閉">${I("x")}</button><h3>${esc(p.split("/").pop())}</h3><img ${imgSrc(p)} style="max-width:100%;border-radius:10px;border:1px solid var(--line)" alt=""><div class="row" style="margin-top:12px"><a class="btn" href="${blob(p)}" target="_blank" rel="noopener">${I("external", 14)}GitHub</a><a class="btn" href="${raw(p)}" download>${I("download", 14)}下載</a></div><p class="muted" style="font-family:var(--mono)">${esc(p)}</p>`); return; }
   if (t.dataset.close !== undefined) { if ($("#detail #edText") && !leaveOk()) return; hideDetail(); return; }
   if (t.dataset.tree) { document.querySelectorAll("#flowTree li").forEach(li => li.classList.toggle("closed", t.dataset.tree === "close" && li.parentElement.id !== "flowTree")); return; }
   if (t.dataset.proj) { switchProject(t.dataset.proj); return; }
@@ -963,8 +1011,10 @@ const mergeProjects = (base, local) => [...base, ...local.filter(l => !base.some
 async function fetchData(repo) {
   const url = qs.get("data") && repo === S.first ? qs.get("data") : `https://raw.githubusercontent.com/${repo}/workbench-data/data.json?t=${Date.now()}`;
   const r = await fetch(url, { cache: "no-store" });
-  if (!r.ok) throw new Error(r.status === 404 ? "這個專案還沒有管理台資料（要先有 workbench Action 並跑過一次）" : `讀取失敗（${r.status}）`);
-  return r.json();
+  if (r.ok) return r.json();
+  // 私人專案：raw 網址沒登入是 404 → 有登入碼就改用 API 讀 workbench-data 分支
+  if (r.status === 404 && !qs.get("data") && auth.token) return (await rawFetch(repo, "data.json", "workbench-data")).json();
+  throw new Error(r.status === 404 ? "讀不到這個專案的管理台資料：如果是私人專案，請先按右上角「登入」設定登入碼；不是的話，要先有 workbench Action 並跑過一次" : `讀取失敗（${r.status}）`);
 }
 async function load(repo) {
   S.repo = repo; $("#projName").textContent = repo; $("#reload").disabled = true;
@@ -1005,7 +1055,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610072000"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610072100"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}

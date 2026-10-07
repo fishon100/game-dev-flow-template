@@ -169,9 +169,11 @@ const { specs } = readSpectra(root, specDir);
 const content = indexContent(root, cfg.content_dirs || ["docs/企劃"]);
 const sheet = content.find(f => f.ext === "csv" && /素材|asset/i.test(f.name));
 const assets = sheet ? { path: sheet.path, ...assetSummary(readFileSync(join(root, sheet.path), "utf8")) } : null;
+// 私人專案：管理台要用登入碼走 API 讀檔、讀圖
+const repoInfo = await gh("").catch(() => ({}));
 const data = {
   generatedAt: new Date().toISOString(),
-  repo, repoUrl, specDir,
+  repo, repoUrl, specDir, private: !!repoInfo.private,
   branch: process.env.GITHUB_REF_NAME && !process.env.GITHUB_REF_NAME.includes("/") ? process.env.GITHUB_REF_NAME : "main",
   contentDirs: cfg.content_dirs || ["docs/企劃"],
   content, assets,

@@ -68,6 +68,10 @@ export function parseProposal(md, fallbackName) {
     breaking: /\*\*BREAKING\*\*/.test(md),
     // 類型：企劃（改玩法、規則書，企劃同意）／技術（重構、效能、工具，不改規則書，程式同意、要程式審查）
     kind: /類型[：:]\s*技術/.test(md) ? "技術" : "企劃",
+    // 文件組合：系統向（只有企劃書）／介面向（企劃書＋示意圖＋規格書）
+    docs: /文件[：:]\s*介面/.test(md) ? "介面向" : "系統向",
+    brief: ((md.match(/^>\s*企劃書[：:]\s*(.+)$/m) || [])[1] || "").trim(),
+    mockups: ((md.match(/^>\s*示意圖[：:]\s*(.+)$/m) || [])[1] || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean),
     // 試玩重點：給試玩的人（QA／企劃）一項一項確認的事
     qaFocus: pick(/試玩重點/).split("\n").map(l => l.match(/^\s*[-*]\s+(.+)/)?.[1]?.trim()).filter(Boolean),
   };
@@ -210,7 +214,7 @@ export function approvalIssueBody(c, repoUrl, specDir = "docs/spectra") {
 
 /** 內容庫索引：列出 dirs 底下的文件與圖檔（給管理台的內容庫、素材庫用；內容由管理台按需讀取） */
 export function indexContent(root, dirs = ["docs/企劃"]) {
-  const keep = /\.(md|csv|png|jpe?g|gif|webp|svg|mp3|ogg|wav|json)$/i;
+  const keep = /\.(md|csv|html|png|jpe?g|gif|webp|svg|mp3|ogg|wav|json)$/i;   // html＝示意圖
   const out = [];
   const walk = (abs, rel) => {
     if (!existsSync(abs)) return;
@@ -220,7 +224,7 @@ export function indexContent(root, dirs = ["docs/企劃"]) {
       if (st.isDirectory()) walk(a, r);
       else if (keep.test(n)) {
         const ext = n.split(".").pop().toLowerCase();
-        const title = ext === "md" ? ((read(a).match(/^# (.+)$/m) || [])[1] || n.replace(/\.md$/, "")).trim() : n.replace(/\.[^.]+$/, "");
+        const title = ext === "html" ? ((read(a).match(/<title>([^<]*)<\/title>/i) || [])[1] || "").trim() || n.replace(/\.html$/, "") : ext === "md" ? ((read(a).match(/^# (.+)$/m) || [])[1] || n.replace(/\.md$/, "")).trim() : n.replace(/\.[^.]+$/, "");
         out.push({ path: r.replace(/^\//, ""), name: n, ext, size: st.size, title });
       }
     }

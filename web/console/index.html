@@ -137,6 +137,13 @@ button.chip { cursor: pointer; } button.chip:hover { filter: brightness(.97); }
 .s-待驗收 { background: var(--violet-soft); color: var(--violet); }
 .s-已完成 { background: var(--ok-soft); color: var(--ok); }
 .c-bad { background: var(--bad-soft); color: var(--bad); } .c-ok { background: var(--ok-soft); color: var(--ok); } .c-warn { background: var(--warn-soft); color: var(--warn); } .c-info { background: var(--info-soft); color: var(--info); }
+/* 提案的文件組合 */
+.docs-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: -4px 0 14px; }
+/* 示意圖檢視器 */
+.mock-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.mock-stage { display: flex; justify-content: center; background: var(--canvas); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px; }
+.mock-stage iframe.mock { width: 390px; max-width: 100%; height: 76vh; border: 1px solid var(--line-strong); border-radius: 18px; background: #fff; }
+.mock-stage.full iframe.mock { width: 100%; border-radius: var(--r); }
 /* 試玩清單 */
 .qa { border: 1px solid var(--line); border-radius: var(--r); margin: 4px 0 18px; overflow: hidden; }
 .qa.all { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
@@ -423,6 +430,6 @@ dialog::backdrop { background: rgb(10 10 20 / .45); }
 </div>
 <dialog id="dlg"></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
-<script type="module" src="app.js?v=202610072000"></script>
+<script type="module" src="app.js?v=202610072100"></script>
 </body>
 </html>

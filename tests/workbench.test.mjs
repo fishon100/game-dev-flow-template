@@ -101,3 +101,21 @@ test("技術提案：類型讀得出來，討論串的勾選框是「程式同�
   assert.equal(body.match(ISSUE_APPROVE_RE)[2], "程式");
   assert.equal(body.replace("- [ ] 程式同意", "- [x] 程式同意").match(ISSUE_APPROVE_RE)[1], "x");
 });
+
+test("介面向提案：讀得出文件組合、企劃書、示意圖（可以好幾個）；沒寫就是系統向", () => {
+  const p = parseProposal(`> 中文標題：遊戲內頁改版\n> 類型：企劃\n> 文件：介面向\n> 企劃書：docs/企劃/企劃書/遊戲內頁.md\n> 示意圖：docs/企劃/示意圖/a.html、docs/企劃/示意圖/b.html\n\n## Why\n\n提升決策效率。\n`, "x");
+  assert.equal(p.docs, "介面向");
+  assert.equal(p.brief, "docs/企劃/企劃書/遊戲內頁.md");
+  assert.deepEqual(p.mockups, ["docs/企劃/示意圖/a.html", "docs/企劃/示意圖/b.html"]);
+  const sys = parseProposal("> 中文標題：排行榜快取\n\n## Why\n\n太慢。\n", "y");
+  assert.equal(sys.docs, "系統向"); assert.deepEqual(sys.mockups, []);
+});
+
+test("內容庫：示意圖（html）也列進來，用 <title> 當名稱", () => {
+  const root = mkdtempSync(join(tmpdir(), "mock-"));
+  mkdirSync(join(root, "docs/企劃/示意圖"), { recursive: true });
+  writeFileSync(join(root, "docs/企劃/示意圖/page.html"), "<!doctype html><title>遊戲下載頁</title><p>hi</p>");
+  const f = indexContent(root).find(x => x.ext === "html");
+  assert.equal(f.title, "遊戲下載頁");
+  assert.equal(f.path, "docs/企劃/示意圖/page.html");
+});

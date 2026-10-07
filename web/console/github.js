@@ -1,6 +1,6 @@
 // 管理台的 GitHub 寫入：登入（登入碼）、同意、留言、開回饋／需求、上傳檔案、編輯內容
 // 登入碼只存在這台瀏覽器（localStorage，或勾「只在這次」時存 sessionStorage），只會送到 api.github.com。
-import { setQaItem, failQaItem, updateAssetRow } from "./shared.js?v=202610072000";
+import { setQaItem, failQaItem, updateAssetRow } from "./shared.js?v=202610072100";
 const KEY = "console:auth";
 const API = "https://api.github.com";
 
@@ -56,6 +56,14 @@ const bufToB64 = buf => { const bytes = new Uint8Array(buf); let s = ""; for (le
 const encPath = p => p.split("/").map(encodeURIComponent).join("/");
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
 
+/** 讀原始內容（私人專案：raw 網址要登入才看得到，改用登入碼走 API）。回傳 fetch 的 Response */
+export async function rawFetch(repo, path, branch = "main") {
+  if (!auth.token) throw new Error("這是私人專案：請先登入（設定登入碼）");
+  const r = await fetch(`${API}/repos/${repo}/contents/${encPath(path)}?ref=${encodeURIComponent(branch)}`, { headers: { Authorization: `Bearer ${auth.token}`, Accept: "application/vnd.github.raw", "X-GitHub-Api-Version": "2022-11-28" } });
+  if (r.status === 401) throw new Error("登入碼無效或過期了，請重新登入");
+  if (!r.ok) throw new Error(r.status === 404 ? "找不到檔案（或登入碼沒有包含這個專案）" : `GitHub 回應 ${r.status}`);
+  return r;
+}
 /** 讀檔（拿 sha 給之後的儲存用） */
 export async function readFile(repo, path, branch = "main") {
   const f = await gh(`/repos/${repo}/contents/${encPath(path)}?ref=${encodeURIComponent(branch)}`);
