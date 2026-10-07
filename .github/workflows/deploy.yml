@@ -1,5 +1,5 @@
 # 推上 main → 跑測試 → 部署到 GitHub Pages → 手機通知（成功或失敗都會通知）
-# 開 PR（技術提案）→ 只跑測試，給程式審查時參考；合併到 main 才部署
+# 開 PR（技術交接）→ 只跑測試，給程式審查時參考；合併到 main 才部署
 # 沒有網站的專案（例如私人專案、免費方案不能開 Pages）：Settings → Secrets and variables → Actions → Variables 加 PAGES = off，只跑測試、不部署
 # 第一次用：Settings → Pages → Source 選「GitHub Actions」；（選用）Secrets 加 NTFY_TOPIC
 name: test-and-deploy

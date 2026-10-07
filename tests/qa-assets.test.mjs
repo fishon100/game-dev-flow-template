@@ -64,7 +64,7 @@ test("試玩清單：優先用「試玩重點」，沒有就用規則的中文�
   assert.deepEqual(qaItems(c, ["手機上玩一次，沒有卡頓"]), ["第 3 關開始，瞄準時看不到預測線", "第 1、2 關還看得到", "手機上玩一次，沒有卡頓"]);
   const noFocus = project(PROPOSAL.replace(/## 試玩重點[\s\S]*?(?=## 需要)/, ""), SPEC);
   assert.deepEqual(qaItems(noFocus, []), ["第 3 關開始不顯示彈道預覽線"]);
-  // 什麼都沒有（例如技術提案）：至少有預設的一項
+  // 什麼都沒有（例如技術交接）：至少有預設的一項
   assert.ok(qaItems({ qaFocus: [], reqs: [] }).length >= 1);
 });
 

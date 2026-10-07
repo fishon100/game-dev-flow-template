@@ -1,9 +1,9 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610081100";
-import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610081100";
-import { icon as I, hasIcon } from "./icons.js?v=202610081100";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610081200";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610081200";
+import { icon as I, hasIcon } from "./icons.js?v=202610081200";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -98,8 +98,8 @@ function sideHtml() {
 // ---------- 共用元件 ----------
 const issueBtns = primary => `<button class="btn ${primary ? "primary" : ""}" data-newissue="回饋">${I("gamepad")}寫回饋</button><button class="btn" data-newissue="需求">${I("lightbulb")}提需求</button>`;
 const chip = s => `<span class="chip s-${esc(s)}">${esc(s)}</span>`;
-// 技術提案（重構、效能、工具；程式同意、程式審查）的標記；誰同意
-const kindChip = c => c.kind === "技術" ? `<span class="chip c-tech" title="技術提案：程式同意，做完開 PR 給程式審查">${I("code", 12)}技術</span>` : "";
+// 技術交接（重構、效能、工具；程式同意、程式審查）的標記；誰同意
+const kindChip = c => c.kind === "技術" ? `<span class="chip c-tech" title="技術交接：程式同意，做完開 PR 給程式審查">${I("code", 12)}技術</span>` : "";
 const approverOf = c => (c.kind === "技術" ? "程式" : "企劃");
 const pct = c => (c.tasks.total ? Math.round((c.tasks.done / c.tasks.total) * 100) : c.archived ? 100 : 0);
 const barHtml = c => `<div class="bar" title="${c.tasks.done}/${c.tasks.total}"><i style="width:${pct(c)}%"></i></div>`;
@@ -208,7 +208,7 @@ V.overview = () => {
     </div>`;
 };
 // ===== 角色與「我的待辦」：首頁依角色列出要做的事 =====
-const ROLES = [["企劃", "fileText", "同意提案、確認素材、驗收、處理回饋"], ["美術", "image", "標【美術】的任務、待製作與被退回的素材、交件"], ["程式", "code", "同意技術提案、審查 PR、修失敗的測試"], ["前端", "layout", "第 5 階段「前端」線的任務；M2 之後補介面細節"], ["後端", "code", "第 5 階段「後端」線的任務；M1 之後就能開工"],["QA", "flask", "照試玩清單試玩、回報不通過"], ["劇本／數值", "book", "標【劇本】【數值】的任務"], ["全部", "users", "看所有要處理的事"]];
+const ROLES = [["企劃", "fileText", "同意提案、確認素材、驗收、處理回饋"], ["美術", "image", "標【美術】的任務、待製作與被退回的素材、交件"], ["程式", "code", "同意技術交接、審查 PR、修失敗的測試"], ["前端", "layout", "第 5 階段「前端」線的任務；M2 之後補介面細節"], ["後端", "code", "第 5 階段「後端」線的任務；M1 之後就能開工"],["QA", "flask", "照試玩清單試玩、回報不通過"], ["劇本／數值", "book", "標【劇本】【數值】的任務"], ["全部", "users", "看所有要處理的事"]];
 const ROLE_TAG = { 企劃: /【企劃】/, 美術: /【美術】/, 程式: /【程式】/, QA: /【QA】/i, "劇本／數值": /【(劇本|數值)】/, 前端: /【前端】/, 後端: /【後端】/ };
 // 試玩清單進度（給待辦、流程圖、明細用）
 const qaText = c => c.qa ? `試玩清單 ${c.qa.done}/${c.qa.total}${c.qa.failed ? `・${c.qa.failed} 項不通過` : c.qa.total && c.qa.done === c.qa.total ? "・全部通過" : ""}` : c.status === "待驗收" ? "試玩清單建立中（約 1 分鐘）" : "";
@@ -255,10 +255,10 @@ function myTodo(role) {
     if (fbOpen.length + rqOpen.length) add("fb", todoLi("bad", `${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, "看過後請 AI 整理成提案", sayBtn(fbOpen.length ? "看回饋" : "看需求") + `<button class="btn sm" data-go="issues">查看</button>`));
   }
   if (is("程式")) {
-    by("待同意").filter(c => c.kind === "技術").forEach(c => add("ap:" + c.id, todoLi("", `${esc(c.title)} ${kindChip(c)}`, `技術提案，等程式同意・${esc(c.id)}`, approveBtn(c, `${I("thumbsUp", 14)}同意`) + detailBtn(c))));
+    by("待同意").filter(c => c.kind === "技術").forEach(c => add("ap:" + c.id, todoLi("", `${esc(c.title)} ${kindChip(c)}`, `技術交接，等程式同意・${esc(c.id)}`, approveBtn(c, `${I("thumbsUp", 14)}同意`) + detailBtn(c))));
     (d.pulls || []).forEach(p => add("pr:" + p.number, todoLi("info", `審查 PR #${p.number} ${esc(p.title)}`, `${esc(p.user || "")}・${ago(p.created)}${p.draft ? "・草稿" : ""}`, `<a class="btn sm" href="${esc(p.url)}" target="_blank" rel="noopener">審查</a>`)));
     if (d.runs[0]?.conclusion === "failure") add("run", todoLi("bad", `最近一次「${esc(d.runs[0].name)}」失敗`, esc(d.runs[0].title || ""), `<a class="btn sm" href="${esc(d.runs[0].url)}" target="_blank" rel="noopener">看原因</a>`));
-    by("待驗收").filter(c => c.kind === "技術").forEach(c => add("vf:" + c.id, todoLi("info", `${esc(c.title)} ${kindChip(c)}`, "技術提案做完了：PR 合併、測試通過後跟 AI 說驗收通過", sayBtn(`${c.id} 驗收通過`) + detailBtn(c))));
+    by("待驗收").filter(c => c.kind === "技術").forEach(c => add("vf:" + c.id, todoLi("info", `${esc(c.title)} ${kindChip(c)}`, "技術交接做完了：PR 合併、測試通過後跟 AI 說驗收通過", sayBtn(`${c.id} 驗收通過`) + detailBtn(c))));
     by("已同意").forEach(c => add("go:" + c.id, todoLi("", esc(c.title), `${approverOf(c)}已同意，還沒開始做`, sayBtn(`做 ${c.id}`) + detailBtn(c))));
   }
   if (is("QA")) {
@@ -294,7 +294,7 @@ function panel(ic, title, body, right = "", flush = false) {
   return `<section class="panel"><div class="ph">${I(ic, 15)}<h3>${title}</h3><span class="spacer"></span>${right}</div><div class="pb ${flush ? "flush" : ""}">${body}</div></section>`;
 }
 
-// ===== 流程圖：上方是兩條標準流程（企劃提案、技術提案），下方每張進行中的提案一條泳道，標出它走到哪 =====
+// ===== 流程圖：上方是兩條標準流程（企劃提案、技術交接），下方每張進行中的提案一條泳道，標出它走到哪 =====
 // ===== 企劃文件流（data.flow.mode === "planning"）：平台專案的 7 格流程，沒有同意／試玩／規則書 =====
 const isPlan = () => S.data?.flow?.mode === "planning";
 const planStages = () => (S.data?.flow?.stages || []);
@@ -417,11 +417,11 @@ function flowDiagram() {
   r++;
   h += at(2, r, node("t2b", "discuss", "先討論", "需求不清楚時", "spectra ghost", "Spectra：/spectra-discuss（先討論，不改程式）"), "cell");
   h += at(5, r, node("t5b", "ingest", "改提案", "改完要再同意一次", "spectra", "Spectra：/spectra-ingest"), "cell");
-  // 技術提案：程式同意、在分支做、開 PR 給程式審查，合併才上線
+  // 技術交接：程式同意、在分支做、開 PR 給程式審查，合併才上線
   r++;
-  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill tech" title="玩家看不到的改變：重構、效能、工具、測試；不改規則書">${I("code", 15)}技術提案</span></div>`;
-  h += at(1, r, node("k1", "wrench", "程式提出", "重構、效能、工具", "tech"));
-  h += at(2, r, node("k2", "fileText", "寫技術提案", "AI 寫・類型：技術", "tech"));
+  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill tech" title="玩家看不到的改變：重構、效能、工具、測試；不改規則書">${I("code", 15)}技術交接</span></div>`;
+  h += at(1, r, node("k1", "wrench", "技術建構", "重構、效能、工具", "tech"));
+  h += at(2, r, node("k2", "fileText", "寫交接文件", "AI 寫・類型：技術", "tech"));
   h += at(3, r, node("k3", "thumbsUp", "程式同意", "勾「程式同意」", "tech"));
   h += at(4, r, node("k4", "code", "分支製作", "AI 先寫測試再做", "tech", "分支 tech/<名稱>"));
   h += at(5, r, node("k5", "gitPr", "開 PR", "GitHub 自動跑測試", "tech"));
@@ -467,7 +467,7 @@ function drawFlowLinks(lanes) {
   // discuss → propose（從下方繞上來）
   const dA = pos("t2b"), dB = pos("t2");
   if (dA && dB) paths.push(`<path class="on dash" d="M${dA.cx} ${dA.t} V${dB.b}"/>`);
-  // 調整？→ 是 → ingest → 回到「企劃同意」（技術提案的「改提案」也一樣回到程式同意）
+  // 調整？→ 是 → ingest → 回到「企劃同意」（技術交接的「改提案」也一樣回到程式同意）
   const a5 = pos("t5"), b5 = pos("t5b"), a3 = pos("t3");
   if (a5 && b5 && a3) {
     paths.push(`<path class="on" d="M${a5.cx} ${a5.b} V${b5.t}"/>`);
@@ -523,7 +523,7 @@ V.flow = () => {
   const { html, lanes } = isPlan() ? flowDiagramPlan() : flowDiagram();
   flowLanes = lanes;
   setTimeout(() => (isPlan() ? drawFlowLinksPlan : drawFlowLinks)(lanes), 0);
-  const sub = isPlan() ? "上方是兩條標準流程（介面向、系統向）；下方每張進行中的提案一條泳道，◆ 是里程碑（M1 需求確認、M2 規格確認）" : "上方是兩條標準流程（企劃提案、技術提案）；下方每張進行中的提案一條泳道，亮色格子＝目前在這一步";
+  const sub = isPlan() ? "上方是兩條標準流程（介面向、系統向）；下方每張進行中的提案一條泳道，◆ 是里程碑（M1 需求確認、M2 規格確認）" : "上方是兩條標準流程（企劃提案、技術交接）；下方每張進行中的提案一條泳道，亮色格子＝目前在這一步";
   return vh("workflow", "流程圖", sub, seg) + html +
     `<div class="legend"><span><span class="node done" style="width:16px;height:16px">${I("check", 10)}</span>完成</span><span><span class="lg" style="background:var(--accent);border-color:var(--accent)"></span>目前這一步（點開看明細）</span><span><span class="node todo"></span>還沒到</span>${isPlan() ? "" : `<span><span class="lg" style="background:var(--accent-soft);border-color:var(--accent-line)"></span>Spectra 指令（AI 執行）</span>`}</div>`;
 };
@@ -730,10 +730,10 @@ const GLOSSARY = [
   ["規劃書", "企劃寫的想法與方向（企劃書），可以隨時改。想做的事要開提案才會進規則書"],
   ["企劃文件流", "平台專案的流程：企劃書（Notion）→ 示意圖＋SPEC → 需求確認 M1 → 美術／後端／前端並行（美術完成約九成後規格確認 M2）→ 驗收。程式由公司團隊做，管理台只追進度"],
   ["里程碑", "M1 需求確認、M2 規格確認：企劃對 AI 說「X 需求確認了」「X 規格確認了」，AI 在 tasks.md 勾起來並記日期。取代遊戲專案的「同意」"],
-  ["待同意", "提案寫好了，等企劃看過按同意（技術提案由程式同意）"],
+  ["待同意", "提案寫好了，等企劃看過按同意（技術交接由程式同意）"],
   ["試玩清單", "提案做完、上線後自動開的清單（GitHub 討論串，手機 App 也能勾）：QA 或企劃一項一項試，沒問題就勾；不通過會自動開 🔴 必修回饋。全部勾完再說「驗收通過」"],
   ["素材確認", "美術在素材庫按「交件」上傳 → 狀態變「待確認」→ 企劃按「採用」或「退回（附意見）」→ 採用的由 AI 在「同步」時放進遊戲，狀態變「已放進遊戲」"],
-  ["技術提案", "程式提出的重構、效能、工具等改動，不改玩法和規則書。由程式同意，做完開 PR，程式審查合併後才上線"],
+  ["技術交接", "交給程式建構的重構、效能、工具等改動，不改玩法和規則書。由程式同意，做完開 PR，程式審查合併後才上線"],
   ["已同意／製作中", "企劃同意了；AI 正在照任務清單做（進度條＝完成的任務）"],
   ["待驗收", "做完、已上線：請試玩，沒問題就說「xxx 驗收通過」"],
   ["已完成", "驗收通過，規則已併回規則書"],
@@ -746,7 +746,7 @@ const GLOSSARY = [
 V.help = () => vh("help", "說明") + `<div class="grid2" style="margin-top:0"><div class="card md">
   <h2>這是什麼</h2><p>專案的管理台：所有專案、每張提案的進度、規則書、劇本與角色等企劃內容、素材都在這裡。首頁會依你的角色列出「我的待辦」。</p>
   <h2>不登入也能用</h2><p>按「同意」「寫回饋」「編輯」「上傳」時，會打開已經填好的 GitHub 網頁，在那裡按一下送出就完成——只要你的瀏覽器有登入 github.com（手機可以用 GitHub App）。想留在管理台裡直接送出、附截圖，再到右上角「登入」設定登入碼。</p>
-  <h2>流程圖</h2><p>上方是兩條<b>標準流程</b>：<b>企劃提案</b>（玩法、畫面、數值；企劃同意、試玩驗收）與<b>技術提案</b>（重構、效能、工具；程式同意、開 PR 給程式審查、合併才上線）；下方每張<b>進行中的提案</b>一條泳道：綠色勾＝走過、亮色格子＝目前在這一步（點開看明細）、空心點＝還沒到。右上角可以切到「結構樹」看每一份文件與任務。</p>
+  <h2>流程圖</h2><p>上方是兩條<b>標準流程</b>：<b>企劃提案</b>（玩法、畫面、數值；企劃同意、試玩驗收）與<b>技術交接</b>（重構、效能、工具；程式同意、開 PR 給程式審查、合併才上線）；下方每張<b>進行中的提案</b>一條泳道：綠色勾＝走過、亮色格子＝目前在這一步（點開看明細）、空心點＝還沒到。右上角可以切到「結構樹」看每一份文件與任務。</p>
   <h2>同意提案</h2><p>在首頁或提案明細按「同意」；也可以在 GitHub 討論串勾 ☐ 企劃同意、Spectra 桌面版勾任務 0.1、Notion 改「同意」，或對 AI 說「同意 xxx」。</p>
   <h2>AI 怎麼配合管理台</h2><p>管理台是給人<b>看進度、做決定</b>的地方（同意、回饋、編輯）；<b>叫 AI 做事一律在 Claude 裡下指令</b>。需要 AI 的地方會有「對 AI 說…」按鈕：按一下複製指令，貼到 Claude 就好。AI 寫好的提案、做完的任務、處理過的回饋，推上 GitHub 後約 1 分鐘就會出現在管理台。</p>
   <h2>內容庫與素材庫</h2><p>劇本、角色、世界觀、名詞、數值、規劃書。每份文件右上角有「編輯」，分類頁有「新文件」。素材庫的素材進度表：美術做好按「交件」，企劃按「採用」或「退回」，採用的由 AI 放進遊戲。</p>
@@ -990,7 +990,7 @@ $("#loginBtn").addEventListener("click", loginFlow);
 
 async function doApprove(id) {
   const c = S.data.changes.find(x => x.id === id); if (!c) return;
-  const v = await dialog(c.kind === "技術" ? "同意技術提案（程式）" : "同意提案", `${target()}${c.kind === "技術" ? `<div class="banner">${I("code", 15)}<span>這是<b>技術提案</b>：由程式同意。做完會開 PR，程式審查合併後才上線。</span></div>` : ""}<p>確定同意 <b>${esc(c.title)}</b>（${esc(c.id)}）？</p>${c.confirm ? `<div class="ask">${esc(c.confirm)}</div>` : ""}<p class="muted">同意後對 AI 說「做 ${esc(c.id)}」就會開始製作。如果還有疑問，請改用「留言」。</p>`, [["", "取消"], ["ok", "同意", "ok"]]);
+  const v = await dialog(c.kind === "技術" ? "同意技術交接（程式）" : "同意提案", `${target()}${c.kind === "技術" ? `<div class="banner">${I("code", 15)}<span>這是<b>技術交接</b>：由程式同意。做完會開 PR，程式審查合併後才上線。</span></div>` : ""}<p>確定同意 <b>${esc(c.title)}</b>（${esc(c.id)}）？</p>${c.confirm ? `<div class="ask">${esc(c.confirm)}</div>` : ""}<p class="muted">同意後對 AI 說「做 ${esc(c.id)}」就會開始製作。如果還有疑問，請改用「留言」。</p>`, [["", "取消"], ["ok", "同意", "ok"]]);
   if (v !== "ok") return;
   try {
     const how = await approveChange(S.repo, c, S.data.specDir, S.data.branch);
@@ -1174,7 +1174,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610081100"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610081200"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}
