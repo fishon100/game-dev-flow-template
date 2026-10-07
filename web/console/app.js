@@ -1,9 +1,9 @@
 // 開發管理台：多專案、流程圖（泳道）、提案、規則書、內容庫、素材庫、專案工具（外掛）、回饋、上線紀錄
 // 資料：各專案 workbench-data 分支的 data.json（GitHub Actions 產生）；文件內容按需從 raw.githubusercontent.com 讀取
 // 登入後（github.js）：同意、留言、寫回饋／提需求、編輯內容、上傳素材都在管理台完成
-import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610081300";
-import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610081300";
-import { icon as I, hasIcon } from "./icons.js?v=202610081300";
+import { auth, verify, tokenUrl, classicTokenUrl, approveChange, comment, createIssue, readFile, saveFile, uploadFile, qaSet, qaFail, saveAssetRow, rawFetch } from "./github.js?v=202610081400";
+import { parseCsv, assetCounts, ASSET_STATES, parseQa } from "./shared.js?v=202610081400";
+import { icon as I, hasIcon } from "./icons.js?v=202610081400";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -323,40 +323,50 @@ const STAGE_HINT_TECH = { 3: "等程式同意", 4: "AI 製作中", 6: "等程式
 function flowDiagramPlan() {
   const d = S.data, ST = planStages(), act = d.changes.filter(c => !c.archived).sort((a, b) => planStageOf(b) - planStageOf(a));
   const arc = d.changes.filter(c => c.archived);
-  const rq = d.requests.filter(i => i.state === "open").length + d.feedback.filter(i => i.state === "open").length;
   let r = 1;
   const at = (col, row, html, cls = "cell") => `<div class="${cls}" style="grid-column:${col + 1};grid-row:${row}">${html}</div>`;
   const node = (id, ic, title, sub, cls = "", tip = "") => `<div class="node ${cls}" data-node="${id}"${tip ? ` title="${esc(tip)}"` : ""}>${I(ic, 18)}<b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
   let h = "";
   for (let i = 0; i <= ST.length; i++) h += `<div class="col-line" style="grid-column:${i + 1}"></div>`;
   h += `<div style="grid-column:1;grid-row:${r}"></div>` + ST.map(s => `<div class="head" style="grid-column:${s.n + 1};grid-row:${r}"><span class="num">${s.n}</span><b>${s.milestone ? "◆ " : ""}${esc(s.label)}</b><small>${esc(s.sub)}</small></div>`).join("");
-  // 標準流程：介面向（7 格）
+  // 標準流程：介面向（7 格）＋ 回去修改的兩列
+  r++;
+  h += `<div class="lane-title" style="grid-row:${r}">標準流程 ①　介面向（直接影響畫面的功能）</div>`;
   r++;
   h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill brand" title="直接影響畫面的功能：企劃書 → 示意圖＋SPEC → 美術／後端／前端並行">${I("layout", 15)}介面向</span></div>`;
   h += at(1, r, node("u1", "lightbulb", "需求", "需求池、回饋"));
-  h += at(2, r, node("u2", "fileText", "企劃書", "Notion，repo 放連結"));
+  h += at(2, r, node("u2", "fileText", "企劃書", "Notion"));
   h += at(3, r, node("u3", "layout", "示意圖＋SPEC", "AI 依企劃書做"));
   h += at(4, r, node("u4", "checkCircle", "需求確認 M1", "需求會議"));
-  h += at(5, r, node("u5", "users", "並行製作", "美術 ◆M2／後端／前端"));
+  h += at(5, r, node("u5", "users", "並行製作", "美術 ◆M2・後端・前端"));
   h += at(6, r, node("u6", "flask", "驗收", "SPEC 驗收條件"));
   h += at(7, r, node("u7", "archive", "完成", "歸檔"));
-  // 回去修改的兩條線：製作／驗收中有回饋 → 改文件 → 重新確認；歸檔後有回饋 → 另開優化案
+  // 回去修改的線，各自一列：① 製作／驗收中有回饋 → 改文件 → 重新確認；② 歸檔後有回饋 → 另開優化案
   r++;
-  h += at(1, r, node("u1b", "sparkles", "優化案", "另開提案、基於原提案", "ghost", "已歸檔的提案不再改；回饋寫成新的優化案（proposal.md 寫「基於：原提案」），示意圖複製新版，企劃書在 Notion 同一頁改版"), "cell");
-  h += at(5, r, node("u5b", "discuss", "回饋要改？", "改企劃書／示意圖／SPEC", "ghost", "跨部門回饋：寫進同一張提案的對應階段，取消對應里程碑（M1／M2）的勾，提案退回那個階段，改好再確認一次"), "cell");
-  h += at(7, r, node("u7b", "message", "歸檔後的回饋", "已完成的提案", "ghost", "提案已歸檔：不改舊提案，另開優化案"), "cell");
+  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill" style="background:var(--line-strong);color:var(--ink)" title="製作或驗收中收到回饋：寫進同一張提案的對應階段，取消 M1／M2 的勾，提案退回那個階段，改好再確認一次">${I("discuss", 15)}回去修改</span></div>`;
+  h += at(5, r, node("u5b", "discuss", "回饋要改？", "退回該階段、取消里程碑", "ghost"), "cell");
+  r++;
+  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill" style="background:var(--line-strong);color:var(--ink)" title="已歸檔的提案不再改：回饋寫成新的優化案（proposal.md 寫「基於：原提案」），示意圖複製新版，企劃書在 Notion 同一頁改版">${I("sparkles", 15)}歸檔後</span></div>`;
+  h += at(1, r, node("u1b", "sparkles", "優化案", "另開提案、基於原提案", "ghost"), "cell");
+  h += at(7, r, node("u7b", "message", "歸檔後的回饋", "已完成的不再改", "ghost"), "cell");
   // 標準流程：系統向（跳過示意圖）
+  r++;
+  h += `<div class="lane-sep" style="grid-row:${r}"></div>`;
+  r++;
+  h += `<div class="lane-title" style="grid-row:${r}">標準流程 ②　系統向（只動後端邏輯；沒有示意圖，回去修改的方式同上）</div>`;
   r++;
   h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill" style="background:var(--line-strong);color:var(--ink)" title="只動後端邏輯、資料，畫面沒有明顯改變：只有企劃書">${I("code", 15)}系統向</span></div>`;
   h += at(1, r, node("s1", "lightbulb", "需求", ""));
   h += at(2, r, node("s2", "fileText", "企劃書", "Notion"));
   h += at(4, r, node("s4", "checkCircle", "需求確認 M1", ""));
-  h += at(5, r, node("s5", "code", "製作", "後端（需要時加前端）"));
+  h += at(5, r, node("s5", "code", "製作", "後端，需要時加前端"));
   h += at(6, r, node("s6", "flask", "驗收", ""));
   h += at(7, r, node("s7", "archive", "完成", ""));
   // 每張進行中的提案
   r++;
-  h += `<div class="lane-title" style="grid-row:${r}">進行中的提案（${act.length}）</div>`;
+  h += `<div class="lane-sep" style="grid-row:${r}"></div>`;
+  r++;
+  h += `<div class="lane-title" style="grid-row:${r}">進行中的提案（${act.length}）・已完成 ${arc.length} 張</div>`;
   const lanes = [];
   for (const c of act) {
     r++;
@@ -372,12 +382,6 @@ function flowDiagramPlan() {
     }
   }
   if (!act.length) { r++; h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"></div><div class="empty" style="grid-column:2 / -1;grid-row:${r};z-index:1">目前沒有進行中的提案。對 AI 說「把 <需求> 開成提案」。</div>`; }
-  r++;
-  h += `<div class="lane-sep" style="grid-row:${r}"></div>`;
-  r++;
-  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill" style="background:var(--line-strong);color:var(--ink)">${I("archive", 15)}其他</span></div>`;
-  h += at(1, r, `<div class="node clickable" data-go="issues">${I("lightbulb", 18)}<b>${rq} 則</b><small>還沒處理的需求／回饋</small></div>`);
-  h += at(7, r, `<div class="node clickable" data-go="changes">${I("archive", 18)}<b>${arc.length} 張</b><small>已完成的提案</small></div>`);
   return { html: `<div class="flow-wrap"><div class="flow plan" id="flow">${h}<svg class="links" id="flowLinks"></svg></div></div>`, lanes };
 }
 // 企劃文件流的連接線：介面向 u1→u7、系統向 s1→s2→s4→…、每條泳道完成綠色／之後灰虛線
@@ -398,17 +402,14 @@ function drawFlowLinksPlan(lanes) {
     paths.push(`<path class="on" d="M${b5.l} ${b5.cy} H${a2.cx + R} Q${a2.cx} ${b5.cy} ${a2.cx} ${b5.cy - R} V${a2.b}"/>`);
     paths.push(`<text x="${a5.cx + 6}" y="${(a5.b + b5.t) / 2 + 4}">是</text>`);
     paths.push(`<text x="${a6.cx + 6}" y="${(a6.b + b5.t) / 2 + 4}">是</text>`);
-    paths.push(`<text class="sm" text-anchor="middle" x="${(a2.cx + b5.l) / 2}" y="${b5.cy - 6}">取消里程碑、退回該階段</text>`);
     paths.push(`<text class="sm" text-anchor="middle" x="${(a5.r + a6.l) / 2}" y="${a5.cy - 5}">否</text>`);
   }
-  // 歸檔後的回饋 → 優化案 → 新的需求（虛線，走在「回饋要改？」下方）
+  // 歸檔後的回饋 → 優化案 → 新的需求（虛線，自己一列，直線到底）
   const a7 = pos("u7"), b7 = pos("u7b"), b1 = pos("u1b"), a1 = pos("u1");
   if (a7 && b7 && b1 && a1) {
-    const y = b7.b + 10;
     paths.push(`<path class="on dash" d="M${a7.cx} ${a7.b} V${b7.t}"/>`);
-    paths.push(`<path class="on dash" d="M${b7.cx} ${b7.b} V${y - R} Q${b7.cx} ${y} ${b7.cx - R} ${y} H${b1.cx + R} Q${b1.cx} ${y} ${b1.cx} ${y - R} V${b1.b}"/>`);
+    paths.push(`<path class="on dash" d="M${b7.l} ${b7.cy} H${b1.r}"/>`);
     paths.push(`<path class="on dash" d="M${b1.cx} ${b1.t} V${a1.b}"/>`);
-    paths.push(`<text class="sm" text-anchor="middle" x="${(b1.cx + b7.cx) / 2}" y="${y - 4}">已歸檔的不再改，另開優化案</text>`);
   }
   for (const L of lanes) {
     const pts = [1, 2, 3, 4, 5, 6, 7].map(n => pos(`${L.id}:${n}`)).filter(Boolean);
@@ -549,7 +550,7 @@ V.flow = () => {
   const { html, lanes } = isPlan() ? flowDiagramPlan() : flowDiagram();
   flowLanes = lanes;
   setTimeout(() => (isPlan() ? drawFlowLinksPlan : drawFlowLinks)(lanes), 0);
-  const sub = isPlan() ? "上方是兩條標準流程（介面向、系統向），第二列是回去修改的線：製作或驗收中有回饋就退回改文件、再確認一次；已歸檔的另開優化案。下方每張進行中的提案一條泳道，◆ 是里程碑（M1 需求確認、M2 規格確認）" : "上方是兩條標準流程（企劃提案、技術交接）；下方每張進行中的提案一條泳道，亮色格子＝目前在這一步";
+  const sub = isPlan() ? "上方兩組標準流程：① 介面向（含回去修改的兩條線：製作或驗收中有回饋就退回改文件、再確認一次；已歸檔的另開優化案）、② 系統向。下方每張進行中的提案一條泳道，◆ 是里程碑（M1 需求確認、M2 規格確認）" : "上方是兩條標準流程（企劃提案、技術交接）；下方每張進行中的提案一條泳道，亮色格子＝目前在這一步";
   return vh("workflow", "流程圖", sub, seg) + html +
     `<div class="legend"><span><span class="node done" style="width:16px;height:16px">${I("check", 10)}</span>完成</span><span><span class="lg" style="background:var(--accent);border-color:var(--accent)"></span>目前這一步（點開看明細）</span><span><span class="node todo"></span>還沒到</span>${isPlan() ? "" : `<span><span class="lg" style="background:var(--accent-soft);border-color:var(--accent-line)"></span>Spectra 指令（AI 執行）</span>`}</div>`;
 };
@@ -1200,7 +1201,7 @@ async function loadProjectSums() {
 }
 
 (async () => {
-  if (qs.has("mock")) await import("./mock.js?v=202610081300"); // 本機測試：假的 GitHub API，不會寫到真的 repo
+  if (qs.has("mock")) await import("./mock.js?v=202610081400"); // 本機測試：假的 GitHub API，不會寫到真的 repo
   renderAuth();
   let base = [];
   try { base = (await (await fetch("projects.json", { cache: "no-store" })).json()).projects || []; } catch {}
