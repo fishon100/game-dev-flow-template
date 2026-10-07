@@ -64,7 +64,7 @@ test("階段：章節編號＝階段，第一個沒做完的章節是目前階�
   assert.deepEqual(p.stages.map(s => s.n), [1, 2, 3, 4, 5, 6]);
   assert.equal(p.stages[3].title, "需求確認");          // ◆ 會被拿掉
   assert.equal(p.current, 5);
-  assert.equal(p.total, 9);
+  assert.equal(p.total, 10);
   assert.equal(p.done, 5);
 });
 
