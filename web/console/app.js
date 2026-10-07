@@ -294,6 +294,80 @@ const STAGES = [
 const stageOf = c => isPlan() ? planStageOf(c) : (c.archived ? 8 : c.status === "待驗收" ? 6 : c.status === "製作中" || c.status === "已同意" ? 4 : c.status === "待同意" ? 3 : 2);
 const STAGE_HINT = { 3: "等企劃同意", 4: "AI 製作中", 6: "等試玩驗收", 8: "已完成" };
 const STAGE_HINT_TECH = { 3: "等程式同意", 4: "AI 製作中", 6: "等程式審查 PR", 8: "已完成" };
+// 企劃文件流的流程圖：上方兩條標準流程（介面向、系統向），下方每張進行中的提案一條泳道
+function flowDiagramPlan() {
+  const d = S.data, ST = planStages(), act = d.changes.filter(c => !c.archived).sort((a, b) => planStageOf(b) - planStageOf(a));
+  const arc = d.changes.filter(c => c.archived);
+  const rq = d.requests.filter(i => i.state === "open").length + d.feedback.filter(i => i.state === "open").length;
+  let r = 1;
+  const at = (col, row, html, cls = "cell") => `<div class="${cls}" style="grid-column:${col + 1};grid-row:${row}">${html}</div>`;
+  const node = (id, ic, title, sub, cls = "", tip = "") => `<div class="node ${cls}" data-node="${id}"${tip ? ` title="${esc(tip)}"` : ""}>${I(ic, 18)}<b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
+  let h = "";
+  for (let i = 0; i <= ST.length; i++) h += `<div class="col-line" style="grid-column:${i + 1}"></div>`;
+  h += `<div style="grid-column:1;grid-row:${r}"></div>` + ST.map(s => `<div class="head" style="grid-column:${s.n + 1};grid-row:${r}"><span class="num">${s.n}</span><b>${s.milestone ? "◆ " : ""}${s.label}</b><small>${s.sub}</small></div>`).join("");
+  // 標準流程：介面向（7 格）
+  r++;
+  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill brand" title="直接影響畫面的功能：企劃書 → 示意圖＋SPEC → 美術／後端／前端並行">${I("layout", 15)}介面向</span></div>`;
+  h += at(1, r, node("u1", "lightbulb", "需求", "需求池、回饋"));
+  h += at(2, r, node("u2", "fileText", "企劃書", "Notion，repo 放連結"));
+  h += at(3, r, node("u3", "layout", "示意圖＋SPEC", "AI 依企劃書做"));
+  h += at(4, r, node("u4", "checkCircle", "需求確認 M1", "需求會議"));
+  h += at(5, r, node("u5", "users", "並行製作", "美術 ◆M2／後端／前端"));
+  h += at(6, r, node("u6", "flask", "驗收", "SPEC 驗收條件"));
+  h += at(7, r, node("u7", "archive", "完成", "歸檔"));
+  // 標準流程：系統向（跳過示意圖）
+  r++;
+  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill" style="background:var(--line-strong);color:var(--ink)" title="只動後端邏輯、資料，畫面沒有明顯改變：只有企劃書">${I("code", 15)}系統向</span></div>`;
+  h += at(1, r, node("s1", "lightbulb", "需求", ""));
+  h += at(2, r, node("s2", "fileText", "企劃書", "Notion"));
+  h += at(4, r, node("s4", "checkCircle", "需求確認 M1", ""));
+  h += at(5, r, node("s5", "code", "製作", "後端（需要時加前端）"));
+  h += at(6, r, node("s6", "flask", "驗收", ""));
+  h += at(7, r, node("s7", "archive", "完成", ""));
+  // 每張進行中的提案
+  r++;
+  h += `<div class="lane-title" style="grid-row:${r}">進行中的提案（${act.length}）</div>`;
+  const lanes = [];
+  for (const c of act) {
+    r++;
+    const st = planStageOf(c);
+    lanes.push({ id: c.id, row: r, st });
+    h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><button class="pill change" data-change="${esc(c.id)}"><span>${esc(short(c.title, 18))}</span><small>${c.optimize ? "優化・" : ""}${esc(c.docs)}</small></button></div>`;
+    for (const s of ST) {
+      if (s.n === 3 && c.docs !== "介面向") { h += at(3, r, `<span data-node="${c.id}:3" class="node todo" style="opacity:.35"></span>`, "cell small"); continue; }
+      const ms = s.milestone ? c.plan?.milestones?.[s.milestone] : null;
+      if (s.n < st) h += at(s.n, r, `<div class="node done" data-node="${c.id}:${s.n}" title="${s.label}：完成${ms?.note ? "・" + esc(ms.note) : ""}">${I("check", 16)}</div>`, "cell small");
+      else if (s.n === st) h += at(s.n, r, `<div class="node current" data-node="${c.id}:${s.n}" data-change="${esc(c.id)}" title="${esc(s.label)}">${I(s.n === 5 ? "users" : s.n === 6 ? "flask" : s.milestone ? "checkCircle" : "fileText", 16)}${s.n === 5 ? `<small>${esc(lanesText(c))}</small>` : ""}</div>`, "cell small");
+      else h += at(s.n, r, `<span class="node todo" data-node="${c.id}:${s.n}"></span>`, "cell small");
+    }
+  }
+  if (!act.length) { r++; h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"></div><div class="empty" style="grid-column:2 / -1;grid-row:${r};z-index:1">目前沒有進行中的提案。對 AI 說「把 <需求> 開成提案」。</div>`; }
+  r++;
+  h += `<div class="lane-sep" style="grid-row:${r}"></div>`;
+  r++;
+  h += `<div class="lane-label" style="grid-column:1;grid-row:${r}"><span class="pill" style="background:var(--line-strong);color:var(--ink)">${I("archive", 15)}其他</span></div>`;
+  h += at(1, r, `<div class="node clickable" data-go="issues">${I("lightbulb", 18)}<b>${rq} 則</b><small>還沒處理的需求／回饋</small></div>`);
+  h += at(7, r, `<div class="node clickable" data-go="changes">${I("archive", 18)}<b>${arc.length} 張</b><small>已完成的提案</small></div>`);
+  return { html: `<div class="flow-wrap"><div class="flow plan" id="flow">${h}<svg class="links" id="flowLinks"></svg></div></div>`, lanes };
+}
+// 企劃文件流的連接線：介面向 u1→u7、系統向 s1→s2→s4→…、每條泳道完成綠色／之後灰虛線
+function drawFlowLinksPlan(lanes) {
+  const flow = $("#flow"), svg = $("#flowLinks"); if (!flow || !svg) return;
+  const box = flow.getBoundingClientRect();
+  const pos = id => { const el = flow.querySelector(`[data-node="${CSS.escape(id)}"]`); if (!el) return null; const r = el.getBoundingClientRect(); return { l: r.left - box.left, r: r.right - box.left, t: r.top - box.top, b: r.bottom - box.top, cx: (r.left + r.right) / 2 - box.left, cy: (r.top + r.bottom) / 2 - box.top }; };
+  const paths = [];
+  const hline = (a, b, cls = "") => { const A = pos(a), B = pos(b); if (A && B) paths.push(`<path class="${cls}" d="M${A.r} ${A.cy} H${B.l}"/>`); };
+  ["u1", "u2", "u3", "u4", "u5", "u6", "u7"].reduce((p, c) => (hline(p, c, "on"), c));
+  ["s1", "s2", "s4", "s5", "s6", "s7"].reduce((p, c) => (hline(p, c, "tech"), c));
+  for (const L of lanes) {
+    const pts = [1, 2, 3, 4, 5, 6, 7].map(n => pos(`${L.id}:${n}`)).filter(Boolean);
+    for (let i = 1; i < pts.length; i++) paths.push(`<path class="${i + 1 <= L.st ? "done" : "dash"}" d="M${pts[i - 1].r} ${pts[i - 1].cy} H${pts[i].l}"/>`);
+  }
+  svg.setAttribute("viewBox", `0 0 ${flow.scrollWidth} ${flow.scrollHeight}`);
+  const arrows = [["base", "var(--line-strong)"], ["on", "var(--accent)"], ["tech", "var(--violet)"], ["done", "var(--ok)"]]
+    .map(([k, c]) => `<marker id="ar-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:${c}"/></marker>`).join("");
+  svg.innerHTML = `<defs>${arrows}</defs>` + paths.join("");
+}
 function flowDiagram() {
   const d = S.data, act = d.changes.filter(c => !c.archived).sort((a, b) => stageOf(b) - stageOf(a));
   const arc = d.changes.filter(c => c.archived);
@@ -390,7 +464,8 @@ function drawFlowLinks(lanes) {
   svg.innerHTML = `<defs>${arrows}</defs>` + paths.join("");
 }
 let flowLanes = [];
-addEventListener("resize", () => { if (S.view === "flow" && S.flowMode === "diagram") drawFlowLinks(flowLanes); });
+const redrawFlowLinks = () => (isPlan() ? drawFlowLinksPlan : drawFlowLinks)(flowLanes);
+addEventListener("resize", () => { if (S.view === "flow" && S.flowMode === "diagram") redrawFlowLinks(); });
 
 function flowTreeHtml() {
   const d = S.data, f = S.treeFilter.trim().toLowerCase();
@@ -418,10 +493,11 @@ function flowTreeHtml() {
 V.flow = () => {
   const seg = `<div class="seg" role="group" aria-label="顯示方式"><button data-flowmode="diagram" aria-pressed="${S.flowMode === "diagram"}">${I("workflow", 14)}流程圖</button><button data-flowmode="tree" aria-pressed="${S.flowMode === "tree"}">${I("tree", 14)}結構樹</button></div>`;
   if (S.flowMode === "tree") return vh("workflow", "流程圖", "專案 → 階段 → 提案 → 文件與任務", seg) + flowTreeHtml();
-  const { html, lanes } = flowDiagram();
+  const { html, lanes } = isPlan() ? flowDiagramPlan() : flowDiagram();
   flowLanes = lanes;
-  setTimeout(() => drawFlowLinks(lanes), 0);
-  return vh("workflow", "流程圖", "上方是兩條標準流程（企劃提案、技術提案）；下方每張進行中的提案一條泳道，亮色格子＝目前在這一步", seg) + html +
+  setTimeout(() => (isPlan() ? drawFlowLinksPlan : drawFlowLinks)(lanes), 0);
+  const sub = isPlan() ? "上方是兩條標準流程（介面向、系統向）；下方每張進行中的提案一條泳道，◆ 是里程碑（M1 需求確認、M2 規格確認）" : "上方是兩條標準流程（企劃提案、技術提案）；下方每張進行中的提案一條泳道，亮色格子＝目前在這一步";
+  return vh("workflow", "流程圖", sub, seg) + html +
     `<div class="legend"><span><span class="node done" style="width:16px;height:16px">${I("check", 10)}</span>完成</span><span><span class="lg" style="background:var(--accent);border-color:var(--accent)"></span>目前這一步（點開看明細）</span><span><span class="node todo"></span>還沒到</span><span><span class="lg" style="background:var(--accent-soft);border-color:var(--accent-line)"></span>Spectra 指令（AI 執行）</span></div>`;
 };
 V.tree = () => { S.flowMode = "tree"; S.view = "flow"; return V.flow(); };
@@ -705,7 +781,7 @@ function selectChange(id) {
   const c = S.data.changes.find(x => x.id === id); if (!c) return;
   S.sel = id; showDetail(changeDetail(c));
   document.querySelectorAll("tr[data-change],.tnode[data-change]").forEach(n => n.classList.toggle("sel", n.dataset.change === id));
-  if (S.view === "flow" && S.flowMode === "diagram") drawFlowLinks(flowLanes);
+  if (S.view === "flow" && S.flowMode === "diagram") redrawFlowLinks();
 }
 
 // ---------- 路由與繪製 ----------
@@ -772,7 +848,7 @@ document.addEventListener("click", e => { if (!e.target.closest("#projMenu,#proj
 addEventListener("keydown", e => { if (e.key === "Escape") closeProjMenu(); });
 $("#reload").addEventListener("click", () => load(S.repo));
 const applyThemeIcon = () => { const dark = (document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark"; $("#theme").innerHTML = I(dark ? "sparkles" : "moon", 17); };
-$("#theme").addEventListener("click", () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); const nx = cur === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = nx; store.set("console:theme", nx); applyThemeIcon(); if (S.view === "flow") drawFlowLinks(flowLanes); });
+$("#theme").addEventListener("click", () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); const nx = cur === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = nx; store.set("console:theme", nx); applyThemeIcon(); if (S.view === "flow") redrawFlowLinks(); });
 if (store.get("console:theme")) document.documentElement.dataset.theme = store.get("console:theme");
 // 上方列的圖示
 $("#menu").innerHTML = I("menu", 18); $("#reload").innerHTML = I("refresh", 17); $("#toWorkbench").innerHTML = I("phone", 17); $("#projChev").innerHTML = I("chevronDown", 14); applyThemeIcon();
