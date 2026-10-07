@@ -29,7 +29,7 @@ if (planning) {
 } else {
   const tag = c => (c.kind === "技術" ? "【技術】" : "");
   section("等企劃同意的提案", by("待同意").filter(c => c.kind !== "技術").map(c => `${c.title}（${c.id}）`));
-  section("等程式同意的技術提案", by("待同意").filter(c => c.kind === "技術").map(c => `${c.title}（${c.id}）`));
+  section("等程式同意的技術交接", by("待同意").filter(c => c.kind === "技術").map(c => `${c.title}（${c.id}）`));
   section("已同意、還沒開始做（可以直接做到上線）", by("已同意").map(c => { todo.push(`做 ${c.id}`); return `${tag(c)}${c.title}（${c.id}）・${c.tasks.approvalNote || "已同意"}`; }));
   section("製作中", by("製作中").map(c => { todo.push(`繼續做 ${c.id}`); return `${tag(c)}${c.title}（${c.id}）・任務 ${c.tasks.done}/${c.tasks.total}・下一步：${c.tasks.next}`; }));
   // 試玩清單（GitHub 討論串，標籤「試玩」）：進度、不通過的項目
@@ -39,7 +39,7 @@ if (planning) {
     bad.forEach(i => todo.push(`修試玩不通過：${c.id}「${i.text}」（回饋 ${i.fails.map(n => "#" + n).join("、")}）`));
     return `試玩清單 #${q.number}：${q.done}/${q.total}${bad.length ? `，不通過：${bad.map(i => `「${i.text}」${i.fails.map(n => "#" + n).join("、")}`).join("；")}` : q.done === q.total ? "，全部通過 → 可以問企劃要不要驗收" : ""}`; };
   section("做完了，等試玩驗收", by("待驗收").filter(c => c.kind !== "技術").map(c => `${c.title}（${c.id}）・${qaLine(c)}`));
-  section("技術提案做完了，等程式確認", by("待驗收").filter(c => c.kind === "技術").map(c => `${c.title}（${c.id}）・${qaLine(c)}・PR 合併、測試通過後說「${c.id} 驗收通過」`));
+  section("技術交接做完了，等程式確認", by("待驗收").filter(c => c.kind === "技術").map(c => `${c.title}（${c.id}）・${qaLine(c)}・PR 合併、測試通過後說「${c.id} 驗收通過」`));
 }
 
 // 素材清單（檔名有「素材」的 CSV）：美術交件了等企劃確認；企劃採用了要放進遊戲
@@ -70,7 +70,7 @@ const lab = (i, n) => (i.labels || []).some(l => l.name === n);
 section("還沒處理的回饋", issues.filter(i => lab(i, "回饋")).map(i => { todo.push(`把 #${i.number} 開成提案（或直接修）`); return `#${i.number} ${i.title}`; }));
 section("還沒處理的需求", issues.filter(i => lab(i, "需求")).map(i => { todo.push(`把 #${i.number} 開成提案`); return `#${i.number} ${i.title}`; }));
 
-// 2b. 等程式審查的 PR（技術提案做完開的 PR，或程式自己開的）
+// 2b. 等程式審查的 PR（技術交接做完開的 PR，或程式自己開的）
 const pulls = json("gh pr list --state open --limit 50 --json number,title,author,isDraft,headRefName,reviewDecision") || [];
 section("等程式審查的 PR", pulls.map(p => `#${p.number} ${p.title}（${p.headRefName}${p.isDraft ? "・草稿" : ""}${p.reviewDecision === "APPROVED" ? "・已核准，可以合併" : p.reviewDecision === "CHANGES_REQUESTED" ? "・程式要求修改" : ""}）`));
 pulls.filter(p => p.reviewDecision === "CHANGES_REQUESTED").forEach(p => todo.push(`照程式的意見修 PR #${p.number}`));

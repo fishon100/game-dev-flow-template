@@ -1,5 +1,5 @@
 // 工作台同步（GitHub Actions 執行；本機要跑需設 GITHUB_TOKEN、GITHUB_REPOSITORY）
-//  1. Issue 裡勾了「企劃同意」（技術提案是「程式同意」）→ 把 tasks.md 的 0.1 打勾並註明來源（之後由 workflow commit）
+//  1. Issue 裡勾了「企劃同意」（技術交接是「程式同意」）→ 把 tasks.md 的 0.1 打勾並註明來源（之後由 workflow commit）
 //  2. 每張待同意的提案都有一個「提案」Issue（沒有就開，企劃在手機就能看、能勾）
 //  3. 已同意的 Issue 貼「已同意」標籤；已完成的提案把 Issue 關掉
 //  3b. 做完（待驗收）的提案開「試玩清單」討論串（QA／企劃一項一項勾）；全部勾完貼「試玩通過」；已完成就關掉
@@ -123,7 +123,7 @@ for (const c of changes) {
   let issue = issueOf(c.id);
   if (!c.archived && !issue) {
     const tech = c.kind === "技術";
-    issue = await post("/issues", { title: `${tech ? "技術提案" : "提案"}：${c.title}（${c.id}）`, body: approvalIssueBody(c, repoUrl, specDir), labels: tech ? ["提案", "技術"] : ["提案"] });
+    issue = await post("/issues", { title: `${tech ? "技術交接" : "提案"}：${c.title}（${c.id}）`, body: approvalIssueBody(c, repoUrl, specDir), labels: tech ? ["提案", "技術"] : ["提案"] });
     allIssues.push(issue);
     console.log(`開 Issue #${issue.number}：${c.id}`);
   }

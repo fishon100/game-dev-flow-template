@@ -5,7 +5,7 @@ import { join } from "node:path";
 export const APPROVAL_RE = /^- \[( |x|X)\] 0\.1 .*$/m;
 export const ISSUE_MARKER = name => `<!-- spectra-change: ${name} -->`;
 export const ISSUE_MARKER_RE = /<!-- spectra-change: ([a-z0-9][a-z0-9-]*) -->/;
-export const ISSUE_APPROVE_RE = /^- \[( |x|X)\] (企劃|程式)同意/m;   // 企劃提案＝企劃同意、技術提案＝程式同意
+export const ISSUE_APPROVE_RE = /^- \[( |x|X)\] (企劃|程式)同意/m;   // 企劃提案＝企劃同意、技術交接＝程式同意
 /** 提案類型 → 誰同意 */
 export const approverOf = kind => (kind === "技術" ? "程式" : "企劃");
 
@@ -266,7 +266,7 @@ export function approvalIssueBody(c, repoUrl, specDir = "docs/spectra") {
     `### 改什麼`,
     cut(c.what || "（proposal.md 沒有寫）", 1500),
     ``,
-    c.kind === "技術" ? `> 🔧 **技術提案**：不改玩法和規則書，由**程式**同意；做完開 PR，程式審查合併後才上線。\n` : "",
+    c.kind === "技術" ? `> 🔧 **技術交接**：不改玩法和規則書，由**程式**同意；做完開 PR，程式審查合併後才上線。\n` : "",
     c.confirm ? `### ❓ 需要${approverOf(c.kind)}確認的事\n${cut(c.confirm, 1200)}\n` : "",
     c.breaking ? `> ⚠️ 這張提案有 **BREAKING**：會拿掉或改變玩家已經習慣的東西。\n` : "",
     `---`,

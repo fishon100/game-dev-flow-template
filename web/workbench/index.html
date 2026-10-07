@@ -197,7 +197,7 @@ button.btn { font: inherit; cursor: pointer; }
       <ol>
         <li>首頁「需要你處理」→ 點提案的 <b>看內容並同意</b></li>
         <li>會打開 GitHub：讀「為什麼、改什麼、需要企劃確認的事」</li>
-        <li>沒問題就勾 <b>☐ 企劃同意</b>（技術提案是 <b>☐ 程式同意</b>，GitHub App 或網頁都能勾）；有意見就在下面留言</li>
+        <li>沒問題就勾 <b>☐ 企劃同意</b>（技術交接是 <b>☐ 程式同意</b>，GitHub App 或網頁都能勾）；有意見就在下面留言</li>
         <li>約 1 分鐘後，工作台會顯示「已同意」，AI 就能開始做</li>
       </ol>
       <p class="muted">其他同意方式也算：Spectra 桌面版勾任務 0.1、Notion 卡片改「同意」後對 AI 說「看提案」、或直接對 AI 說「同意 xxx」。</p>
@@ -350,8 +350,8 @@ import { icon as I } from "../console/icons.js?v=202610071900";
       if (fbOpen.length + rqOpen.length) item(`${fbOpen.length} 則回饋、${rqOpen.length} 則需求還沒處理`, `對 AI 說「${fbOpen.length ? "看回饋" : "看需求"}」整理成提案`, hsay(fbOpen.length ? "看回饋" : "看需求"));
     }
     if (is("程式")) {
-      waiting.filter(c => c.kind === "技術").forEach(c => item(`${esc(c.title)} <span class="chip c-tech">技術</span>`, "技術提案，等你（程式）同意", c.issue ? hbtn(c.issue.url, "看內容並同意") : ""));
-      toClose.filter(c => c.kind === "技術").forEach(c => item(esc(c.title), `技術提案做完了：確認後對 AI 說「${esc(c.id)} 驗收通過」`, hsay(`${c.id} 驗收通過`)));
+      waiting.filter(c => c.kind === "技術").forEach(c => item(`${esc(c.title)} <span class="chip c-tech">技術</span>`, "技術交接，等你（程式）同意", c.issue ? hbtn(c.issue.url, "看內容並同意") : ""));
+      toClose.filter(c => c.kind === "技術").forEach(c => item(esc(c.title), `技術交接做完了：確認後對 AI 說「${esc(c.id)} 驗收通過」`, hsay(`${c.id} 驗收通過`)));
       (d.pulls || []).forEach(p => item(`審查 PR #${p.number} ${esc(p.title)}`, `${esc(p.user || "")}・${ago(p.created)}`, hbtn(p.url, "審查")));
       if (lastRun && lastRun.conclusion === "failure") item(`最近一次「${esc(lastRun.name)}」失敗`, esc(lastRun.title || ""), hbtn(lastRun.url, "看原因"));
       active.filter(c => c.status === "已同意").forEach(c => item(esc(c.title), `${c.kind === "技術" ? "程式" : "企劃"}已同意：對 AI 說「做 ${esc(c.id)}」`, hsay(`做 ${c.id}`)));

@@ -88,7 +88,7 @@ export async function uploadFile(repo, path, file, message, branch = "main") {
   throw new Error("同名檔案太多了，請換一個檔名");
 }
 
-const APPROVE_RE = /^- \[( |x|X)\] (企劃|程式)同意/m;   // 企劃提案＝企劃同意、技術提案＝程式同意
+const APPROVE_RE = /^- \[( |x|X)\] (企劃|程式)同意/m;   // 企劃提案＝企劃同意、技術交接＝程式同意
 const TASK_RE = /^- \[( |x|X)\] 0\.1 .*$/m;
 /** 同意提案：有 Issue 就在 Issue 上打勾（Actions 會寫回 tasks.md）；沒有 Issue 就直接改 tasks.md */
 export async function approveChange(repo, change, specDir, branch) {
