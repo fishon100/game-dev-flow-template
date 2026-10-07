@@ -45,6 +45,59 @@ export function parseTasks(md) {
   };
 }
 
+// ---------- 企劃文件流（workbench.config.json 的 flow: "planning"）：平台專案用 ----------
+// 階段寫死在這裡，管理台從 data.json 的 flow.stages 讀，兩邊同一份
+export const PLAN_STAGES = [
+  { n: 1, label: "需求", sub: "需求池／回饋" },
+  { n: 2, label: "企劃書", sub: "Notion" },
+  { n: 3, label: "示意圖", sub: "介面向才有" },
+  { n: 4, label: "需求確認", sub: "M1", milestone: "M1" },
+  { n: 5, label: "並行製作", sub: "美術／後端／前端" },
+  { n: 6, label: "驗收", sub: "SPEC 驗收條件" },
+  { n: 7, label: "完成", sub: "歸檔" },
+];
+// 里程碑項目：「M1 需求確認：…（2026-10-07，需求會議）」→ 代號、文字、括號裡的註記
+export const MILESTONE_RE = /^(M\d)\s+(.*?)(?:（([^）]*)）)?\s*$/;
+
+/** tasks.md → 階段（## N. 標題）、並行線（### 線名）、里程碑（M1／M2）。目前階段＝第一個還有沒勾項目的章節 */
+export function parseStages(md) {
+  const stages = [];
+  let st = null, lane = null;
+  for (const line of md.split("\n")) {
+    const h2 = line.match(/^##\s+(\d+)\.\s*(.+?)\s*$/);
+    if (h2) { st = { n: +h2[1], title: h2[2].replace(/\s*◆\s*$/, ""), lanes: [] }; lane = null; stages.push(st); continue; }
+    const h3 = line.match(/^###\s+(.+?)\s*$/);
+    if (h3 && st) { lane = { name: h3[1], items: [] }; st.lanes.push(lane); continue; }
+    const it = line.match(/^- \[( |x|X)\] (.*)$/);
+    if (it && st) {
+      if (!lane) { lane = { name: "", items: [] }; st.lanes.push(lane); }
+      const text = it[2].trim(), done = it[1] !== " ", m = text.match(MILESTONE_RE);
+      lane.items.push({ done, text, milestone: m ? m[1] : "", note: m && done ? (m[3] || "") : "" });
+    }
+  }
+  const milestones = {};
+  for (const s of stages) {
+    for (const l of s.lanes) {
+      l.total = l.items.length; l.done = l.items.filter(i => i.done).length;
+      for (const i of l.items) if (i.milestone) milestones[i.milestone] = { done: i.done, note: i.note, stage: s.n, text: i.text };
+    }
+    s.total = s.lanes.reduce((a, l) => a + l.total, 0); s.done = s.lanes.reduce((a, l) => a + l.done, 0);
+  }
+  return {
+    stages, milestones,
+    current: stages.find(s => s.done < s.total)?.n ?? null,
+    total: stages.reduce((a, s) => a + s.total, 0),
+    done: stages.reduce((a, s) => a + s.done, 0),
+  };
+}
+
+/** 企劃文件流的狀態文字：目前階段的名稱／待歸檔／已完成 */
+export function planStatus(archived, plan) {
+  if (archived) return "已完成";
+  if (plan.current == null) return "待歸檔";
+  return PLAN_STAGES.find(s => s.n === plan.current)?.label || `第 ${plan.current} 階段`;
+}
+
 /** 把 tasks.md 的 0.1 打勾並加註來源；已經勾過就原樣回傳 */
 export function approveTasks(md, note) {
   return md.replace(APPROVAL_RE, line => {
