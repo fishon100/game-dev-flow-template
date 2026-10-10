@@ -1,0 +1,278 @@
+{
+ "generatedAt": "2026-10-10T15:26:02.363Z",
+ "repo": "fishon100/game-dev-flow-template",
+ "repoUrl": "https://github.com/fishon100/game-dev-flow-template",
+ "specDir": "docs/spectra",
+ "changesDir": "docs/spectra/changes",
+ "flow": {
+  "mode": "game"
+ },
+ "private": false,
+ "branch": "main",
+ "contentDirs": [
+  "docs/企劃"
+ ],
+ "content": [
+  {
+   "path": "docs/企劃/README.md",
+   "name": "README.md",
+   "ext": "md",
+   "size": 854,
+   "title": "企劃文件（基本版：沒有 Notion 時放這裡）"
+  },
+  {
+   "path": "docs/企劃/主架構規劃書.md",
+   "name": "主架構規劃書.md",
+   "ext": "md",
+   "size": 450,
+   "title": "<遊戲名> — 主架構規劃書"
+  },
+  {
+   "path": "docs/企劃/圖/回饋/20261005171137-69jg.jpg",
+   "name": "20261005171137-69jg.jpg",
+   "ext": "jpg",
+   "size": 1035918,
+   "title": "20261005171137-69jg"
+  },
+  {
+   "path": "docs/企劃/知識庫/名詞表.md",
+   "name": "名詞表.md",
+   "ext": "md",
+   "size": 259,
+   "title": "名詞表"
+  },
+  {
+   "path": "docs/企劃/素材/素材.csv",
+   "name": "素材.csv",
+   "ext": "csv",
+   "size": 273,
+   "title": "素材"
+  },
+  {
+   "path": "docs/企劃/開發日誌.md",
+   "name": "開發日誌.md",
+   "ext": "md",
+   "size": 199,
+   "title": "開發日誌"
+  }
+ ],
+ "assets": {
+  "path": "docs/企劃/素材/素材.csv",
+  "toMake": [
+   "hero_idle.png",
+   "coin.png",
+   "bg_sky.png"
+  ],
+  "toReview": [],
+  "toPlace": [],
+  "returned": []
+ },
+ "name": "範例遊戲（接球）",
+ "links": [
+  {
+   "label": "試玩",
+   "url": "https://fishon100.github.io/game-dev-flow-template/"
+  }
+ ],
+ "tools": [
+  {
+   "label": "測試頁",
+   "url": "https://fishon100.github.io/game-dev-flow-template/test.html",
+   "icon": "flask",
+   "desc": "瀏覽器自動測試（版面、畫面）"
+  }
+ ],
+ "changes": [],
+ "specs": [
+  {
+   "name": "catch-ball",
+   "purpose": "範本附的範例遊戲（接球）。用來示範「規則 → 測試 → 程式」怎麼對應；開新專案時用第一張申請單把它換掉。",
+   "requirements": 3,
+   "scenarios": 6,
+   "reqs": [
+    {
+     "name": "Lives",
+     "zh": "開局 3 條命、0 分；球掉出底部扣 1 條命並重新發球，命用完遊戲結束。",
+     "scenarios": [
+      "New game",
+      "Losing the last life ends the game"
+     ]
+    },
+    {
+     "name": "Paddle",
+     "zh": "滑板跟著手指或滑鼠左右移，不會超出台面；打中間往正上彈，越邊邊越斜，最斜 60 度。",
+     "scenarios": [
+      "Paddle stays on the board",
+      "Center hit goes straight up",
+      "Edge hit is capped"
+     ]
+    },
+    {
+     "name": "Walls",
+     "zh": "球不管多快都不會穿牆。",
+     "scenarios": [
+      "No tunneling at max speed"
+     ]
+    }
+   ]
+  }
+ ],
+ "requests": [],
+ "feedback": [
+  {
+   "number": 2,
+   "title": "回饋：（測試）管理台送出回饋",
+   "url": "https://github.com/fishon100/game-dev-flow-template/issues/2",
+   "state": "closed",
+   "created": "2026-10-05T17:11:40Z",
+   "user": "fishon100",
+   "labels": [
+    "回饋"
+   ],
+   "comments": 1,
+   "assignees": []
+  }
+ ],
+ "commits": [
+  {
+   "sha": "ff4e00a",
+   "date": "2026-10-08T01:35:09+08:00",
+   "author": "fishon100",
+   "subject": "style(console): 流程圖文字加深加大（副標改次要文字色、12.5px；標題 13.5px；格子加高加寬） (#10)",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/ff4e00a50f83c2dcf3417dde58ec0927868cb87a"
+  },
+  {
+   "sha": "289f918",
+   "date": "2026-10-08T01:29:48+08:00",
+   "author": "fishon100",
+   "subject": "feat(console): 遊戲流程圖簡化：7 欄、程式併進製作底下、回去修改與歸檔後各一列，拿掉技術交接線與 Spectra 指令名稱 (#9)",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/289f918e54df0f0179e10928d52a2706fecc9962"
+  },
+  {
+   "sha": "e33bf03",
+   "date": "2026-10-08T00:48:04+08:00",
+   "author": "fishon100",
+   "subject": "feat(console): 流程圖可展開「各部門流程」（部門泳道細項；平台 5 列、遊戲 6 列） (#8)",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/e33bf03f90c38e755b46b0368d5b276cbf6fbae2"
+  },
+  {
+   "sha": "76d0e32",
+   "date": "2026-10-08T00:18:32+08:00",
+   "author": "fishon100",
+   "subject": "style(console): 企劃文件流流程圖留白：格子、分組、標題列間距加大，欄寬 150px (#7)",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/76d0e32dc1a0d0bda123eb4ba610482b52badf9e"
+  },
+  {
+   "sha": "3439908",
+   "date": "2026-10-08T00:15:44+08:00",
+   "author": "fishon100",
+   "subject": "feat(console): 企劃文件流流程圖排版：回去修改與歸檔後各一列、分組標題與分隔線、拿掉「其他」、欄位加寬 (#6)",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/3439908a8603c951de747edaafee22c1cbc89d5a"
+  },
+  {
+   "sha": "ffc516a",
+   "date": "2026-10-08T00:10:46+08:00",
+   "author": "fishon100",
+   "subject": "feat(console): 企劃文件流流程圖加回去修改的線（回饋退回改文件、歸檔後另開優化案） (#5)",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/ffc516a199ca6b057a92346c7e8c4a2c2f46c54e"
+  },
+  {
+   "sha": "a22e65a",
+   "date": "2026-10-08T00:06:40+08:00",
+   "author": "fishon100",
+   "subject": "用語：技術提案→技術交接、程式提出→技術建構、寫技術提案→寫交接文件 (#4)",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/a22e65ad72a34c31933a0f771c4795d0c63d3b1b"
+  },
+  {
+   "sha": "c6e8940",
+   "date": "2026-10-07T22:17:30+08:00",
+   "author": "fishon100",
+   "subject": "企劃文件流（planning flow）模式 (#3)",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/c6e8940c0fa8d11398fe8dcc370030bef48d3572"
+  },
+  {
+   "sha": "6852f1f",
+   "date": "2026-10-07T16:59:40+08:00",
+   "author": "fishon100",
+   "subject": "規則：介面向的前端可以交給公司前端團隊（交接包＋情境清單驗收）",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/6852f1fac5beb672f97f0580ef524e4a10190fb6"
+  },
+  {
+   "sha": "476de3f",
+   "date": "2026-10-07T16:22:44+08:00",
+   "author": "fishon100",
+   "subject": "規格書工具與提案更新同步",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/476de3fae574d1d8b3fab4bd9dd71888b377f28a"
+  },
+  {
+   "sha": "0f4734e",
+   "date": "2026-10-07T16:03:35+08:00",
+   "author": "fishon100",
+   "subject": "管理台專案目錄加入遊戲內頁",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/0f4734e29a67d844d8c252bf5456e858c0dca775"
+  },
+  {
+   "sha": "85d9447",
+   "date": "2026-10-07T16:03:19+08:00",
+   "author": "fishon100",
+   "subject": "管理台：測試用假 API 支援私人專案的原始內容（Accept raw）；版本號更新",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/85d94476caca289f493984f31d2ba4de8054ab90"
+  },
+  {
+   "sha": "8a268c9",
+   "date": "2026-10-07T16:00:51+08:00",
+   "author": "fishon100",
+   "subject": "規格書可以就是示意圖的註解模式：提案「> 規格書：」、管理台規格書按鈕（同檔時提示開註解模式）",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/8a268c9c5fd10a4d0080a8a5cc2ff91061b17f0a"
+  },
+  {
+   "sha": "8271568",
+   "date": "2026-10-07T15:56:19+08:00",
+   "author": "fishon100",
+   "subject": "企劃書、示意圖、規格書（系統向／介面向）＋私人專案",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/82715686065ce56a83a35d150021488e713b6220"
+  },
+  {
+   "sha": "60bc480",
+   "date": "2026-10-07T11:51:06+08:00",
+   "author": "fishon100",
+   "subject": "管理台流程圖加上箭頭：每條連線都標方向（顏色跟線一樣，深色模式也對）；格子間距加大到約 22px，箭頭看得清楚",
+   "url": "https://github.com/fishon100/game-dev-flow-template/commit/60bc48016267af05d3dda405c4d17d487bb39573"
+  }
+ ],
+ "runs": [
+  {
+   "name": "自動測試＋部署",
+   "status": "completed",
+   "conclusion": "success",
+   "date": "2026-10-07T17:35:12Z",
+   "url": "https://github.com/fishon100/game-dev-flow-template/actions/runs/37660212735",
+   "title": "style(console): 流程圖文字加深加大（副標改次要文字色、12.5px；標題 13.5px；格子加高加寬） (#10)"
+  },
+  {
+   "name": "自動測試＋部署",
+   "status": "completed",
+   "conclusion": "success",
+   "date": "2026-10-07T17:35:09Z",
+   "url": "https://github.com/fishon100/game-dev-flow-template/actions/runs/37660206135",
+   "title": "style(console): 流程圖文字加深加大（副標改次要文字色、12.5px；標題 13.5px；格子加高加寬）"
+  },
+  {
+   "name": "自動測試＋部署",
+   "status": "completed",
+   "conclusion": "success",
+   "date": "2026-10-07T17:29:52Z",
+   "url": "https://github.com/fishon100/game-dev-flow-template/actions/runs/37659512837",
+   "title": "feat(console): 遊戲流程圖簡化：7 欄、程式併進製作底下、回去修改與歸檔後各一列，拿掉技術交接線與 Spectra 指令名稱 (#9)"
+  },
+  {
+   "name": "自動測試＋部署",
+   "status": "completed",
+   "conclusion": "success",
+   "date": "2026-10-07T17:29:49Z",
+   "url": "https://github.com/fishon100/game-dev-flow-template/actions/runs/37659507506",
+   "title": "feat(console): 遊戲流程圖簡化：7 欄、程式併進製作底下、回去修改與歸檔後各一列，拿掉技術交接線與 Spectra 指令名稱"
+  }
+ ],
+ "pulls": []
+}
